@@ -8,7 +8,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
-	<script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
+	
 
 <style>
  
@@ -2177,589 +2177,339 @@ function ucusEtiketleriniHaritayaEkle(rota) {
 
 
 
-document.getElementById('geojson-ekle-btn').addEventListener('click', async function (event) {
-    event.preventDefault();
 
-    const repo = 'ademcolak68-debug/ucus-genel';
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/veriler`;
+const geojsonEkleBtn = document.getElementById('geojson-ekle-btn');
 
-    let secimModal = null;
-    let escDinleyici = null;
-    let modalIzleyici = null;
+geojsonEkleBtn.addEventListener('click', async function () {
+    let secimKutusu = document.getElementById('geojson-github-secim');
+
+    if (!secimKutusu) {
+        secimKutusu = document.createElement('div');
+        secimKutusu.id = 'geojson-github-secim';
+
+        Object.assign(secimKutusu.style, {
+            position: 'fixed',
+            inset: '0',
+            zIndex: '99999',
+            background: 'rgba(15,23,42,0.6)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '16px'
+        });
+
+        secimKutusu.innerHTML = `
+            <div style="width:100%;max-width:400px;background:#fff;border-radius:9px;overflow:hidden;box-shadow:0 12px 40px #0003;font-family:Arial,sans-serif">
+                <div style="padding:13px 16px;background:#0f172a;color:white;font-size:14px;font-weight:600;display:flex;justify-content:space-between;align-items:center">
+                    <span>GeoJSON Dosyası Seç</span>
+                    <button type="button" id="geojson-github-kapat" style="border:0;background:none;color:white;font-size:24px;cursor:pointer">×</button>
+                </div>
+                <div style="padding:16px">
+                    <select id="geojson-github-dosyalar" style="box-sizing:border-box;width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px">
+                        <option value="">GitHub dosyaları yükleniyor...</option>
+                    </select>
+                    <div id="geojson-github-mesaj" style="margin-top:9px;font-size:11px;color:#64748b"></div>
+                </div>
+                <div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px">
+                    <button type="button" id="geojson-github-vazgec" style="padding:9px 12px;border:0;border-radius:5px;cursor:pointer">Vazgeç</button>
+                    <button type="button" id="geojson-github-ekle" style="padding:9px 12px;border:0;border-radius:5px;background:#0891b2;color:white;cursor:pointer">Haritaya Ekle</button>
+                </div>
+            </div>`;
+
+        document.body.appendChild(secimKutusu);
+
+        function kapat() {
+            secimKutusu.style.display = 'none';
+        }
+
+        secimKutusu.querySelector('#geojson-github-kapat').addEventListener('click', kapat);
+        secimKutusu.querySelector('#geojson-github-vazgec').addEventListener('click', kapat);
+
+        secimKutusu.addEventListener('click', function (e) {
+            if (e.target === secimKutusu) kapat();
+        });
+    }
+
+    secimKutusu.style.display = 'flex';
+
+    const liste = secimKutusu.querySelector('#geojson-github-dosyalar');
+    const mesaj = secimKutusu.querySelector('#geojson-github-mesaj');
+    const ekleBtn = secimKutusu.querySelector('#geojson-github-ekle');
+
+    liste.innerHTML = '<option value="">Dosyalar yükleniyor...</option>';
+    mesaj.textContent = 'GitHub veriler klasörü okunuyor...';
+    ekleBtn.disabled = true;
+
+    let geojsonDosyalari;
 
     try {
-        // GitHub veriler klasörünü oku.
-        const cevap = await fetch(apiUrl);
+        const cevap = await fetch(
+            'https://api.github.com/repos/ademcolak68-debug/ucus-genel/contents/veriler'
+        );
 
         if (!cevap.ok) {
-            throw new Error('GitHub klasörü okunamadı: ' + cevap.status);
+            throw new Error('GitHub dosyaları alınamadı: ' + cevap.status);
         }
 
         const dosyalar = await cevap.json();
 
-        const uygunDosyalar = dosyalar.filter(dosya =>
-            dosya.type === 'file' &&
-            /\.(geojson|json|kml)$/i.test(dosya.name)
+        geojsonDosyalari = dosyalar.filter(d =>
+            d.type === 'file' &&
+            /\.(geojson|json)$/i.test(d.name)
         );
 
-        if (uygunDosyalar.length === 0) {
-            bildirimGoster(
-                'GitHub veriler klasöründe GeoJSON, JSON veya KML dosyası bulunamadı.',
-                'olumsuz'
-            );
+        liste.innerHTML = '';
+
+        if (!geojsonDosyalari.length) {
+            liste.innerHTML = '<option value="">GeoJSON dosyası bulunamadı</option>';
+            mesaj.textContent = 'veriler klasöründe GeoJSON veya JSON dosyası bulunamadı.';
             return;
         }
 
-        // Bağımsız seçim penceresi.
-        secimModal = document.createElement('div');
-
-        secimModal.style.cssText = `
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 18px;
-            box-sizing: border-box;
-            background: rgba(10, 18, 32, 0.72);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-        `;
-
-        const kutu = document.createElement('div');
-        kutu.id = 'geojson-import-modal-kutu';
-
-        kutu.style.cssText = `
-            width: 100%;
-            max-width: 420px;
-            padding: 16px 22px 22px;
-            box-sizing: border-box;
-            background: linear-gradient(145deg, #eef5ff, #ffffff 75%);
-            color: #172033;
-            border: 1px solid #d5e3f8;
-            border-radius: 20px;
-            box-shadow: 0 24px 70px rgba(0,0,0,0.3);
-            font-family: Arial, sans-serif;
-            animation: geojsonModalAc 0.2s ease-out;
-        `;
-
-        if (!document.getElementById('geojson-import-modal-css')) {
-            const stil = document.createElement('style');
-            stil.id = 'geojson-import-modal-css';
-
-            stil.textContent = `
-                @keyframes geojsonModalAc {
-                    from {
-                        opacity: 0;
-                        transform: translateY(12px) scale(0.98);
-                    }
-                    to {
-                        opacity: 1;
-                        transform: translateY(0) scale(1);
-                    }
-                }
-
-                #geojson-import-modal-select:focus {
-                    outline: 3px solid rgba(37, 99, 235, 0.18);
-                    border-color: #2563eb !important;
-                }
-
-                #geojson-import-tamam:active,
-                #geojson-import-iptal:active {
-                    transform: scale(0.98);
-                }
-
-                @media (max-width: 480px) {
-                    #geojson-import-modal-kutu {
-                        padding: 12px 18px 18px !important;
-                        border-radius: 18px !important;
-                        background: linear-gradient(
-                            145deg,
-                            #dceaff 0%,
-                            #f0f5ff 45%,
-                            #ffffff 100%
-                        ) !important;
-                        border: 1px solid #c7dafa !important;
-                        box-shadow: 0 18px 45px rgba(20, 50, 100, 0.28) !important;
-                    }
-
-                    #geojson-import-modal-kutu h3 {
-                        margin-top: 0 !important;
-                        margin-bottom: 6px !important;
-                        font-size: 20px !important;
-                    }
-
-                    #geojson-import-modal-kutu p {
-                        margin-top: 0 !important;
-                        margin-bottom: 14px !important;
-                        font-size: 13px !important;
-                    }
-
-                    #geojson-import-modal-kutu select {
-                        margin-top: 0 !important;
-                        margin-bottom: 16px !important;
-                        min-height: 52px !important;
-                        border-radius: 11px !important;
-                        background-color: rgba(255, 255, 255, 0.9) !important;
-                        border-color: #bfd2ef !important;
-                        font-size: 14px !important;
-                    }
-
-                    #geojson-import-modal-butonlar {
-                        flex-direction: column-reverse !important;
-                        gap: 10px !important;
-                    }
-
-                    #geojson-import-tamam,
-                    #geojson-import-iptal {
-                        width: 100% !important;
-                        min-height: 54px !important;
-                        padding: 15px 20px !important;
-                        border-radius: 12px !important;
-                        font-size: 15px !important;
-                    }
-
-                    #geojson-import-tamam {
-                        background: linear-gradient(
-                            135deg,
-                            #2563eb,
-                            #1d4ed8
-                        ) !important;
-                        box-shadow: 0 5px 14px rgba(37, 99, 235, 0.25) !important;
-                    }
-
-                    #geojson-import-iptal {
-                        background: rgba(255, 255, 255, 0.85) !important;
-                        border-color: #cbd5e1 !important;
-                    }
-                }
-            `;
-
-            document.head.appendChild(stil);
-        }
-
-        const simge = document.createElement('div');
-        simge.textContent = '🗺️';
-
-        simge.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 54px;
-            height: 54px;
-            margin-bottom: 10px;
-            border-radius: 16px;
-            background: #eaf2ff;
-            color: #2563eb;
-            font-size: 27px;
-        `;
-
-        const baslik = document.createElement('h3');
-        baslik.textContent = 'GeoJSON / KML Ekle';
-
-        baslik.style.cssText = `
-            margin: 0 0 9px;
-            font-size: 21px;
-            line-height: 1.3;
-            font-weight: 700;
-            color: #172033;
-        `;
-
-        const aciklama = document.createElement('p');
-        aciklama.textContent =
-            'GitHub veriler klasöründen haritaya eklenecek dosyayı seçin.';
-
-        aciklama.style.cssText = `
-            margin: 0 0 19px;
-            font-size: 14px;
-            line-height: 1.6;
-            color: #64748b;
-        `;
-
-        const liste = document.createElement('select');
-        liste.id = 'geojson-import-modal-select';
-
-        liste.style.cssText = `
-            display: block;
-            width: 100%;
-            min-height: 54px;
-            padding: 13px 40px 13px 14px;
-            margin: 0 0 22px;
-            box-sizing: border-box;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            background: #f8fafc;
-            color: #172033;
-            font-size: 15px;
-            font-family: Arial, sans-serif;
-            cursor: pointer;
-        `;
-
-        const ilkSecenek = document.createElement('option');
-        ilkSecenek.value = '';
-        ilkSecenek.textContent = 'Dosya adı seçin';
-        ilkSecenek.disabled = true;
-        ilkSecenek.selected = true;
-        liste.appendChild(ilkSecenek);
-
-        uygunDosyalar
-            .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-            .forEach(dosya => {
-                const secenek = document.createElement('option');
-                secenek.value = dosya.download_url;
-                secenek.textContent = dosya.name;
-                liste.appendChild(secenek);
-            });
-
-        const butonlar = document.createElement('div');
-        butonlar.id = 'geojson-import-modal-butonlar';
-
-        butonlar.style.cssText = `
-            display: flex;
-            gap: 12px;
-            width: 100%;
-        `;
-
-        const iptalBtn = document.createElement('button');
-        iptalBtn.id = 'geojson-import-iptal';
-        iptalBtn.type = 'button';
-        iptalBtn.textContent = 'İptal';
-
-        iptalBtn.style.cssText = `
-            flex: 1;
-            min-width: 0;
-            min-height: 54px;
-            padding: 15px 20px;
-            border: 1px solid #cbd5e1;
-            border-radius: 12px;
-            background: #ffffff;
-            color: #475569;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            transition: transform 0.15s, background 0.15s;
-        `;
-
-        const ekleBtn = document.createElement('button');
-        ekleBtn.id = 'geojson-import-tamam';
-        ekleBtn.type = 'button';
-        ekleBtn.textContent = 'Tamam';
-
-        ekleBtn.style.cssText = `
-            flex: 1.3;
-            min-width: 0;
-            min-height: 54px;
-            padding: 15px 20px;
-            border: none;
-            border-radius: 12px;
-            background: #2563eb;
-            color: #ffffff;
-            font-size: 15px;
-            font-weight: 700;
-            cursor: pointer;
-            box-shadow: 0 5px 14px rgba(37,99,235,0.24);
-            transition: transform 0.15s, background 0.15s;
-        `;
-
-        let modalKapatildi = false;
-
-        const modalKapat = () => {
-            if (modalKapatildi) return;
-            modalKapatildi = true;
-
-            if (secimModal?.isConnected) {
-                secimModal.remove();
-            }
-
-            if (escDinleyici) {
-                document.removeEventListener('keydown', escDinleyici);
-            }
-
-            if (modalIzleyici) {
-                modalIzleyici.disconnect();
-            }
-        };
-
-        iptalBtn.onclick = modalKapat;
-
-        secimModal.addEventListener('click', e => {
-            if (e.target === secimModal) {
-                modalKapat();
-            }
+        geojsonDosyalari.forEach((dosya, index) => {
+            const secenek = document.createElement('option');
+            secenek.value = String(index);
+            secenek.textContent = dosya.name;
+            liste.appendChild(secenek);
         });
 
-        escDinleyici = e => {
-            if (e.key === 'Escape') {
-                modalKapat();
-            }
-        };
-
-        document.addEventListener('keydown', escDinleyici);
-
-        butonlar.append(iptalBtn, ekleBtn);
-        kutu.append(simge, baslik, aciklama, liste, butonlar);
-        secimModal.appendChild(kutu);
-        document.body.appendChild(secimModal);
-
-        // Dosya seçimi ve haritaya ekleme.
-        ekleBtn.onclick = async () => {
-            if (!liste.value) {
-                bildirimGoster(
-                    'Lütfen önce bir dosya adı seçin.',
-                    'olumsuz'
-                );
-                liste.focus();
-                return;
-            }
-
-            ekleBtn.disabled = true;
-            iptalBtn.disabled = true;
-            liste.disabled = true;
-            ekleBtn.textContent = 'Yükleniyor...';
-            ekleBtn.style.opacity = '0.7';
-            ekleBtn.style.cursor = 'wait';
-
-            try {
-                const secilenDosya = uygunDosyalar.find(
-                    dosya => dosya.download_url === liste.value
-                );
-
-                if (!secilenDosya) {
-                    throw new Error('Seçilen dosya bulunamadı.');
-                }
-
-                const dosyaCevap = await fetch(secilenDosya.download_url);
-
-                if (!dosyaCevap.ok) {
-                    throw new Error('Seçilen dosya GitHub üzerinden okunamadı.');
-                }
-
-                let veri;
-
-                if (/\.kml$/i.test(secilenDosya.name)) {
-                    if (!window.toGeoJSON?.kml) {
-                        throw new Error(
-                            'KML dönüştürücü yüklenmemiş. toGeoJSON script satırını kontrol edin.'
-                        );
-                    }
-
-                    const kmlMetni = await dosyaCevap.text();
-                    const xml = new DOMParser().parseFromString(
-                        kmlMetni,
-                        'text/xml'
-                    );
-
-                    if (xml.querySelector('parsererror')) {
-                        throw new Error('KML dosyasının XML biçimi geçersiz.');
-                    }
-
-                    veri = window.toGeoJSON.kml(xml);
-                } else {
-                    veri = await dosyaCevap.json();
-                }
-
-                // GeoJSON'u FeatureCollection biçimine getir.
-                if (veri?.type === 'FeatureCollection') {
-                    // Mevcut FeatureCollection korunur.
-                } else if (veri?.type === 'Feature') {
-                    veri = {
-                        type: 'FeatureCollection',
-                        features: [veri]
-                    };
-                } else if (
-                    veri?.type === 'Polygon' ||
-                    veri?.type === 'MultiPolygon'
-                ) {
-                    veri = {
-                        type: 'FeatureCollection',
-                        features: [{
-                            type: 'Feature',
-                            properties: {},
-                            geometry: veri
-                        }]
-                    };
-                } else {
-                    throw new Error(
-                        'Dosyada desteklenen GeoJSON geometrisi bulunamadı.'
-                    );
-                }
-
-                if (!Array.isArray(veri.features) || veri.features.length === 0) {
-                    throw new Error(
-                        'Dosyada haritaya eklenecek özellik bulunamadı.'
-                    );
-                }
-
-                // Önceki animasyonu durdur.
-                if (window.parselHaloAnimasyonu) {
-                    cancelAnimationFrame(window.parselHaloAnimasyonu);
-                    window.parselHaloAnimasyonu = null;
-                }
-
-                // Önceki katmanları kaldır.
-                [
-                    'hedef-parsel-sinir',
-                    'hedef-parsel-halo',
-                    'hedef-parsel-dolgu'
-                ].forEach(id => {
-                    if (map.getLayer(id)) {
-                        map.removeLayer(id);
-                    }
-                });
-
-                if (map.getSource('hedef-parsel-geojson')) {
-                    map.removeSource('hedef-parsel-geojson');
-                }
-
-                // Mevcut harita katmanları.
-                map.addSource('hedef-parsel-geojson', {
-                    type: 'geojson',
-                    data: veri
-                });
-
-                map.addLayer({
-                    id: 'hedef-parsel-dolgu',
-                    type: 'fill',
-                    source: 'hedef-parsel-geojson',
-                    paint: {
-                        'fill-color': '#0284c7',
-                        'fill-opacity': 0.25
-                    },
-                    filter: ['==', '$type', 'Polygon']
-                });
-
-                map.addLayer({
-                    id: 'hedef-parsel-halo',
-                    type: 'line',
-                    source: 'hedef-parsel-geojson',
-                    paint: {
-                        'line-color': '#0891b2',
-                        'line-width': 10,
-                        'line-opacity': 0.95
-                    }
-                });
-
-                map.addLayer({
-                    id: 'hedef-parsel-sinir',
-                    type: 'line',
-                    source: 'hedef-parsel-geojson',
-                    paint: {
-                        'line-color': '#ffffff',
-                        'line-width': 4,
-                        'line-opacity': 1
-                    }
-                });
-
-                // Harita sınırlarını hesapla.
-                const koordinatlar = [];
-
-                function koordinatlariTopla(deger) {
-                    if (
-                        Array.isArray(deger) &&
-                        deger.length >= 2 &&
-                        typeof deger[0] === 'number' &&
-                        typeof deger[1] === 'number'
-                    ) {
-                        koordinatlar.push(deger);
-                        return;
-                    }
-
-                    if (Array.isArray(deger)) {
-                        deger.forEach(koordinatlariTopla);
-                    }
-                }
-
-                veri.features.forEach(feature => {
-                    if (feature.geometry?.coordinates) {
-                        koordinatlariTopla(feature.geometry.coordinates);
-                    }
-                });
-
-                if (koordinatlar.length === 0) {
-                    throw new Error('Dosyada geçerli koordinat bulunamadı.');
-                }
-
-                const bounds = new mapboxgl.LngLatBounds();
-
-                koordinatlar.forEach(koordinat => {
-                    bounds.extend(koordinat);
-                });
-
-                map.fitBounds(bounds, {
-                    padding: 70,
-                    maxZoom: 19,
-                    duration: 1800
-                });
-
-                // Sürekli genişleyip daralan halo animasyonu.
-                let baslangic = null;
-
-                function haloAnimasyonu(zaman) {
-                    if (!map.getLayer('hedef-parsel-halo')) {
-                        window.parselHaloAnimasyonu = null;
-                        return;
-                    }
-
-                    if (!baslangic) {
-                        baslangic = zaman;
-                    }
-
-                    const faz = ((zaman - baslangic) % 1400) / 1400;
-                    const dalga = (Math.sin(faz * Math.PI * 2) + 1) / 2;
-
-                    map.setPaintProperty(
-                        'hedef-parsel-halo',
-                        'line-width',
-                        7 + dalga * 7
-                    );
-
-                    map.setPaintProperty(
-                        'hedef-parsel-halo',
-                        'line-opacity',
-                        0.4 + dalga * 0.55
-                    );
-
-                    window.parselHaloAnimasyonu =
-                        requestAnimationFrame(haloAnimasyonu);
-                }
-
-                window.parselHaloAnimasyonu =
-                    requestAnimationFrame(haloAnimasyonu);
-
-                modalKapat();
-
-                bildirimGoster(
-                    'GeoJSON haritaya eklendi: ' + secilenDosya.name,
-                    'olumlu'
-                );
-
-            } catch (hata) {
-                console.error('GeoJSON/KML ekleme hatası:', hata);
-
-                bildirimGoster(
-                    hata.message || 'Dosya haritaya eklenemedi.',
-                    'olumsuz'
-                );
-
-                ekleBtn.disabled = false;
-                iptalBtn.disabled = false;
-                liste.disabled = false;
-                ekleBtn.textContent = 'Tekrar Dene';
-                ekleBtn.style.opacity = '1';
-                ekleBtn.style.cursor = 'pointer';
-            }
-        };
+        mesaj.textContent = geojsonDosyalari.length + ' dosya bulundu.';
+        ekleBtn.disabled = false;
 
     } catch (hata) {
-        console.error('GitHub dosya listesi hatası:', hata);
-
-        bildirimGoster(
-            'GitHub veriler klasörü okunamadı. Depo erişimini kontrol edin.',
-            'olumsuz'
-        );
+        console.error('GitHub GeoJSON listesi alınamadı:', hata);
+        liste.innerHTML = '<option value="">Dosyalar yüklenemedi</option>';
+        mesaj.textContent = hata.message;
+        return;
     }
+
+    ekleBtn.onclick = async () => {
+        const secilenIndex = liste.value;
+
+        if (secilenIndex === '') {
+            mesaj.textContent = 'Önce bir dosya seç.';
+            return;
+        }
+
+        const dosya = geojsonDosyalari[Number(secilenIndex)];
+        if (!dosya) return;
+
+        ekleBtn.disabled = true;
+        mesaj.textContent = dosya.name + ' indiriliyor...';
+
+        try {
+            const dosyaCevap = await fetch(dosya.download_url);
+
+            if (!dosyaCevap.ok) {
+                throw new Error('GeoJSON dosyası indirilemedi.');
+            }
+
+            const geojson = await dosyaCevap.json();
+
+            // GeoJSON verisini FeatureCollection biçimine getir
+            let veri = geojson;
+
+            if (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon') {
+                veri = {
+                    type: 'FeatureCollection',
+                    features: [{
+                        type: 'Feature',
+                        properties: {},
+                        geometry: geojson
+                    }]
+                };
+            } else if (geojson.type === 'GeometryCollection') {
+                veri = {
+                    type: 'FeatureCollection',
+                    features: geojson.geometries.map(geometri => ({
+                        type: 'Feature',
+                        properties: {},
+                        geometry: geometri
+                    }))
+                };
+            } else if (geojson.type === 'Feature') {
+                veri = {
+                    type: 'FeatureCollection',
+                    features: [geojson]
+                };
+            }
+
+            if (!Array.isArray(veri.features) || veri.features.length === 0) {
+                throw new Error('GeoJSON içinde gösterilecek geometri bulunamadı.');
+            }
+
+            const kaynakId = 'hedef-parsel-geojson';
+            const dolguId = 'hedef-parsel-dolgu';
+            const haloId = 'hedef-parsel-halo';
+            const sinirId = 'hedef-parsel-sinir';
+
+            // Önceki animasyonu durdur
+            if (window.parselHaloAnimasyonu) {
+                cancelAnimationFrame(window.parselHaloAnimasyonu);
+                window.parselHaloAnimasyonu = null;
+            }
+
+            // Önceki katmanları ve kaynağı kaldır
+            [sinirId, haloId, dolguId].forEach(id => {
+                if (map.getLayer(id)) map.removeLayer(id);
+            });
+
+            if (map.getSource(kaynakId)) {
+                map.removeSource(kaynakId);
+            }
+
+            map.addSource(kaynakId, {
+                type: 'geojson',
+                data: veri
+            });
+
+            // Parsel dolgusu
+            map.addLayer({
+                id: dolguId,
+                type: 'fill',
+                source: kaynakId,
+                filter: [
+                    'any',
+                    ['==', ['geometry-type'], 'Polygon'],
+                    ['==', ['geometry-type'], 'MultiPolygon']
+                ],
+                paint: {
+                    'fill-color': '#0284c7',
+                    'fill-opacity': 0.25
+                }
+            });
+
+            // Turkuaz halo
+            map.addLayer({
+                id: haloId,
+                type: 'line',
+                source: kaynakId,
+                filter: [
+                    'any',
+                    ['==', ['geometry-type'], 'Polygon'],
+                    ['==', ['geometry-type'], 'MultiPolygon']
+                ],
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#0891b2',
+                    'line-width': 10,
+                    'line-opacity': 0.95
+                }
+            });
+
+            // Beyaz parsel sınırı
+            map.addLayer({
+                id: sinirId,
+                type: 'line',
+                source: kaynakId,
+                filter: [
+                    'any',
+                    ['==', ['geometry-type'], 'Polygon'],
+                    ['==', ['geometry-type'], 'MultiPolygon']
+                ],
+                layout: {
+                    'line-join': 'round',
+                    'line-cap': 'round'
+                },
+                paint: {
+                    'line-color': '#ffffff',
+                    'line-width': 4,
+                    'line-opacity': 1
+                }
+            });
+
+            // GeoJSON koordinatlarını topla
+            const koordinatlar = [];
+
+            function koordinatlariTara(deger) {
+                if (!Array.isArray(deger)) return;
+
+                if (
+                    deger.length >= 2 &&
+                    typeof deger[0] === 'number' &&
+                    typeof deger[1] === 'number'
+                ) {
+                    koordinatlar.push(deger);
+                    return;
+                }
+
+                deger.forEach(koordinatlariTara);
+            }
+
+            function geometriKoordinatlariniTara(geometri) {
+                if (!geometri) return;
+
+                if (geometri.type === 'GeometryCollection') {
+                    geometri.geometries.forEach(geometriKoordinatlariniTara);
+                } else {
+                    koordinatlariTara(geometri.coordinates);
+                }
+            }
+
+            veri.features.forEach(feature => {
+                geometriKoordinatlariniTara(feature.geometry);
+            });
+
+            if (koordinatlar.length === 0) {
+                throw new Error('GeoJSON koordinatları bulunamadı.');
+            }
+
+            const sinirlar = new mapboxgl.LngLatBounds();
+
+            koordinatlar.forEach(koordinat => {
+                sinirlar.extend([koordinat[0], koordinat[1]]);
+            });
+
+            map.fitBounds(sinirlar, {
+                padding: 70,
+                maxZoom: 19,
+                duration: 1800
+            });
+
+            // Halo animasyonu
+            let baslangicZamani = null;
+
+            function haloAnimasyonunuCalistir(zaman) {
+                if (!map.getLayer(haloId)) {
+                    window.parselHaloAnimasyonu = null;
+                    return;
+                }
+
+                if (baslangicZamani === null) {
+                    baslangicZamani = zaman;
+                }
+
+                const oran = ((zaman - baslangicZamani) % 1600) / 1600;
+                const parlaklik = (1 - Math.cos(oran * Math.PI * 2)) / 2;
+
+                map.setPaintProperty(haloId, 'line-width', 7 + parlaklik * 7);
+                map.setPaintProperty(haloId, 'line-opacity', 0.4 + parlaklik * 0.55);
+
+                window.parselHaloAnimasyonu =
+                    requestAnimationFrame(haloAnimasyonunuCalistir);
+            }
+
+            window.parselHaloAnimasyonu =
+                requestAnimationFrame(haloAnimasyonunuCalistir);
+
+            console.log('Yüklenen GeoJSON:', veri);
+            bildirimGoster('GeoJSON haritaya eklendi: ' + dosya.name, 'olumlu');
+
+            secimKutusu.style.display = 'none';
+
+        } catch (hata) {
+            console.error('GeoJSON yükleme hatası:', hata);
+            mesaj.textContent = 'Dosya yüklenemedi: ' + hata.message;
+            bildirimGoster('GeoJSON yüklenemedi: ' + hata.message, 'olumsuz');
+        } finally {
+            ekleBtn.disabled = false;
+        }
+    };
 });
+
 
 
 
