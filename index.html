@@ -2787,108 +2787,179 @@ document.getElementById('ucus-export-btn').addEventListener('click', function ()
 
 
 
-document.getElementById('ucus-import-btn').addEventListener('click', function () {
-    document.getElementById('ucus-import-dosya').click();
-});
+document.getElementById('ucus-import-dosya').addEventListener('click', async function (event) {
+    event.preventDefault();
 
-document.getElementById('ucus-import-dosya').addEventListener('change', async function (event) {
-    const dosya = event.target.files[0];
-    if (!dosya) return;
+    const repo = 'adem-colak68-debug/ucus-genel';
+    const apiUrl = `https://api.github.com/repos/${repo}/contents/`;
 
     try {
-        const veri = JSON.parse(await dosya.text());
+        const cevap = await fetch(apiUrl);
 
-        if (
-            veri.format !== 'ennetmax-ucus-projesi' ||
-            veri.version !== 1 ||
-            !veri.ucusAyarlari ||
-            !Array.isArray(veri.ucusAyarlari.duraklar) ||
-            !Array.isArray(veri.tanitimBilgileri)
-        ) {
-            throw new Error('JSON dosya biçimi geçersiz.');
+        if (!cevap.ok) {
+            throw new Error('GitHub klasörü okunamadı.');
         }
 
-        const ayarlar = veri.ucusAyarlari;
+        const dosyalar = await cevap.json();
 
-        // Kamera ayarlarını doğrula.
-        for (const alan of [
-            'baslangicZoom', 'ucusZoom', 'kameraAcisi', 'kameraYonu'
-        ]) {
-            if (!Number.isFinite(Number(ayarlar[alan]))) {
-                throw new Error('Kamera ayarı geçersiz: ' + alan);
-            }
-        }
-
-        // Durakların koordinat ve alanlarını doğrula.
-        for (const durak of ayarlar.duraklar) {
-            if (
-                !durak ||
-                typeof durak.ad !== 'string' ||
-                typeof durak.koordinat !== 'string' ||
-                !Array.isArray(durak.koordinat.split(','))
-            ) {
-                throw new Error('Durak bilgisi geçersiz.');
-            }
-
-            const koordinat = durak.koordinat.split(',').map(Number);
-
-            if (
-                koordinat.length !== 2 ||
-                !koordinat.every(Number.isFinite) ||
-                koordinat[0] < -180 || koordinat[0] > 180 ||
-                koordinat[1] < -90 || koordinat[1] > 90
-            ) {
-                throw new Error('Geçersiz koordinat: ' + durak.koordinat);
-            }
-        }
-
-        // Tanıtım satırlarını doğrula.
-        for (const bilgi of veri.tanitimBilgileri) {
-            if (
-                !bilgi ||
-                typeof bilgi.text !== 'string' ||
-                typeof bilgi.color !== 'string' ||
-                !Number.isFinite(Number(bilgi.size)) ||
-                !Number.isFinite(Number(bilgi.weight)) ||
-                typeof bilgi.isBadge !== 'boolean'
-            ) {
-                throw new Error('Tanıtım bilgisi geçersiz.');
-            }
-        }
-
-        // Geçerli dosyayı mevcut kayıt anahtarlarına aktar.
-        localStorage.setItem(
-            UCUS_AYAR_KAYIT_ANAHTARI,
-            JSON.stringify(ayarlar)
+        const jsonDosyalari = dosyalar.filter(dosya =>
+            dosya.type === 'file' &&
+            dosya.name.toLowerCase().endsWith('.json')
         );
 
-        localStorage.setItem(
-            BILGI_KAYIT_ANAHTARI,
-            JSON.stringify(veri.tanitimBilgileri)
-        );
-
-        // Mevcut yükleme fonksiyonu kamera ve durakları doldurur.
-        ucusAyarlariniYukle();
-
-        // Tanıtım bilgilerini bellekte güncelle.
-        tanitimBilgileri = veri.tanitimBilgileri;
-
-        // Tanıtım modalı açıksa satırları da yenile.
-        const bilgiModal = document.getElementById('bilgiler-modal');
-        if (bilgiModal && bilgiModal.style.display !== 'none') {
-            bilgiSatirlariniGoster();
+        if (jsonDosyalari.length === 0) {
+            bildirimGoster('GitHub klasöründe JSON dosyası bulunamadı.', 'olumsuz');
+            return;
         }
 
-        bildirimGoster('Uçuş ve tanıtım bilgileri içe aktarıldı.', 'olumlu');
+        const secim = document.createElement('select');
+        secim.style.cssText = 'width:100%;padding:10px;margin:10px 0;';
+
+        jsonDosyalari.forEach(dosya => {
+            const secenek = document.createElement('option');
+            secenek.value = dosya.download_url;
+            secenek.textContent = dosya.name;
+            secim.appendChild(secenek);
+        });
+
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position:fixed;inset:0;background:rgba(0,0,0,.6);
+            z-index:99999;display:flex;align-items:center;
+            justify-content:center;padding:20px;
+        `;
+
+        const kutu = document.createElement('div');
+        kutu.style.cssText = `
+            background:white;padding:20px;border-radius:8px;
+            width:100%;max-width:400px;color:#222;
+        `;
+
+        const baslik = document.createElement('h3');
+        baslik.textContent = 'GitHub Uçuş Dosyası Seç';
+
+        const ekleBtn = document.createElement('button');
+        ekleBtn.textContent = 'Seçilen Dosyayı Ekle';
+
+        const iptalBtn = document.createElement('button');
+        iptalBtn.textContent = 'İptal';
+        iptalBtn.style.marginLeft = '8px';
+
+        kutu.append(baslik, secim, ekleBtn, iptalBtn);
+        modal.appendChild(kutu);
+        document.body.appendChild(modal);
+
+        iptalBtn.onclick = () => modal.remove();
+
+        ekleBtn.onclick = async () => {
+            ekleBtn.disabled = true;
+
+            try {
+                const dosyaCevap = await fetch(secim.value);
+
+                if (!dosyaCevap.ok) {
+                    throw new Error('JSON dosyası GitHub üzerinden okunamadı.');
+                }
+
+                const veri = await dosyaCevap.json();
+
+                if (
+                    veri.format !== 'ennetmax-ucus-projesi' ||
+                    veri.version !== 1 ||
+                    !veri.ucusAyarlari ||
+                    !Array.isArray(veri.ucusAyarlari.duraklar) ||
+                    !Array.isArray(veri.tanitimBilgileri)
+                ) {
+                    throw new Error('JSON dosya biçimi geçersiz.');
+                }
+
+                const ayarlar = veri.ucusAyarlari;
+
+                for (const alan of [
+                    'baslangicZoom', 'ucusZoom', 'kameraAcisi', 'kameraYonu'
+                ]) {
+                    if (!Number.isFinite(Number(ayarlar[alan]))) {
+                        throw new Error('Kamera ayarı geçersiz: ' + alan);
+                    }
+                }
+
+                for (const durak of ayarlar.duraklar) {
+                    if (
+                        !durak ||
+                        typeof durak.ad !== 'string' ||
+                        typeof durak.koordinat !== 'string'
+                    ) {
+                        throw new Error('Durak bilgisi geçersiz.');
+                    }
+
+                    const koordinat = durak.koordinat.split(',').map(Number);
+
+                    if (
+                        koordinat.length !== 2 ||
+                        !koordinat.every(Number.isFinite) ||
+                        koordinat[0] < -180 || koordinat[0] > 180 ||
+                        koordinat[1] < -90 || koordinat[1] > 90
+                    ) {
+                        throw new Error('Geçersiz koordinat: ' + durak.koordinat);
+                    }
+                }
+
+                for (const bilgi of veri.tanitimBilgileri) {
+                    if (
+                        !bilgi ||
+                        typeof bilgi.text !== 'string' ||
+                        typeof bilgi.color !== 'string' ||
+                        !Number.isFinite(Number(bilgi.size)) ||
+                        !Number.isFinite(Number(bilgi.weight)) ||
+                        typeof bilgi.isBadge !== 'boolean'
+                    ) {
+                        throw new Error('Tanıtım bilgisi geçersiz.');
+                    }
+                }
+
+                localStorage.setItem(
+                    UCUS_AYAR_KAYIT_ANAHTARI,
+                    JSON.stringify(ayarlar)
+                );
+
+                localStorage.setItem(
+                    BILGI_KAYIT_ANAHTARI,
+                    JSON.stringify(veri.tanitimBilgileri)
+                );
+
+                ucusAyarlariniYukle();
+
+                tanitimBilgileri = veri.tanitimBilgileri;
+
+                const bilgiModal = document.getElementById('bilgiler-modal');
+
+                if (bilgiModal && bilgiModal.style.display !== 'none') {
+                    bilgiSatirlariniGoster();
+                }
+
+                modal.remove();
+
+                bildirimGoster(
+                    'GitHub uçuş ve tanıtım bilgileri içe aktarıldı.',
+                    'olumlu'
+                );
+
+            } catch (hata) {
+                console.error('Import hatası:', hata);
+                bildirimGoster(
+                    hata.message || 'Dosya yüklenemedi.',
+                    'olumsuz'
+                );
+                ekleBtn.disabled = false;
+            }
+        };
 
     } catch (hata) {
-        console.error('Import hatası:', hata);
+        console.error('GitHub dosya listeleme hatası:', hata);
         bildirimGoster(
-            'Dosya yüklenemedi. JSON biçimini kontrol et.',
+            'GitHub klasörü okunamadı. Depo erişimini kontrol et.',
             'olumsuz'
         );
-    } finally {
-        event.target.value = '';
     }
 });
 
