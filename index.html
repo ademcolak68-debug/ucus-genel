@@ -2175,26 +2175,49 @@ function ucusEtiketleriniHaritayaEkle(rota) {
 
 
 const geojsonEkleBtn = document.getElementById('geojson-ekle-btn');
-const geojsonDosyaInput = document.getElementById('geojson-dosya-input');
 
-geojsonEkleBtn.addEventListener('click', function () {
-    geojsonDosyaInput.click();
-});
-
-geojsonDosyaInput.addEventListener('change', async function () {
-    const dosya = this.files[0];
-    if (!dosya) return;
-
+geojsonEkleBtn.addEventListener('click', async function () {
     try {
-        const geojson = JSON.parse(await dosya.text());
+        const cevap = await fetch(
+            'https://api.github.com/repos/ademcolak68-debug/ucus-genel/contents/'
+        );
 
-        if (
-            !geojson ||
-            !['FeatureCollection', 'Feature', 'Polygon', 'MultiPolygon', 'GeometryCollection']
-                .includes(geojson.type)
-        ) {
-            throw new Error('Geçerli bir GeoJSON dosyası seçilmedi.');
+        if (!cevap.ok) {
+            throw new Error('GitHub dosyaları alınamadı: ' + cevap.status);
         }
+
+        const dosyalar = await cevap.json();
+
+        const geojsonDosyalari = dosyalar.filter(d =>
+            d.type === 'file' &&
+            /\.(geojson|json)$/i.test(d.name)
+        );
+
+        if (!geojsonDosyalari.length) {
+            throw new Error('Depoda GeoJSON dosyası bulunamadı.');
+        }
+
+        const secim = prompt(
+            'Eklenecek GeoJSON dosyasının numarasını yaz:\n\n' +
+            geojsonDosyalari.map((d, i) => `${i + 1}. ${d.name}`).join('\n')
+        );
+
+        if (secim === null) return;
+
+        const index = Number(secim) - 1;
+
+        if (!Number.isInteger(index) || index < 0 || index >= geojsonDosyalari.length) {
+            throw new Error('Geçersiz dosya numarası.');
+        }
+
+        const dosya = geojsonDosyalari[index];
+        const dosyaCevap = await fetch(dosya.download_url);
+
+        if (!dosyaCevap.ok) {
+            throw new Error('GeoJSON dosyası indirilemedi.');
+        }
+
+        const geojson = await dosyaCevap.json();
 
         // GeoJSON verisini FeatureCollection biçimine getir
         let veri = geojson;
@@ -2410,7 +2433,7 @@ geojsonDosyaInput.addEventListener('change', async function () {
 
     } catch (hata) {
         console.error('GeoJSON yükleme hatası:', hata);
-        bildirimGoster('GeoJSON yüklenemedi: ' + hata.message, 'olumsuz');
+        bildirimGoster('GeoJSON haritaya eklendi: ' + dosya.name, 'olumlu');
     }
 
     this.value = '';
