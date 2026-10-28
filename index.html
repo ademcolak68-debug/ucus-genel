@@ -900,6 +900,7 @@ body {
     <div class="logo-alt">GAYRİMENKUL</div>
 </div>
 
+<audio id="ucusFonMuzigi" src="./muzik/ucus-muzik.mp3" preload="auto"></audio>
 
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoiZ2VvZ3JhcGh5cHJvZiIsImEiOiJjanYxb2t1ZG8wNGU1NGFsNXVkcnhzNmFpIn0.M3qCJK8FYa06B-Irc6FD-g';
@@ -1080,6 +1081,56 @@ function kameraAyarlariniOku() {
 
 
 
+function ucusMuziginiBaslat() {
+    const muzik = document.getElementById('ucusFonMuzigi');
+    if (!muzik) return;
+
+    muzik.pause();
+    muzik.currentTime = 0;
+    muzik.volume = 0;
+
+    muzik.play().then(() => {
+        const baslangic = performance.now();
+
+        function sesiAc(zaman) {
+            if (muzik.paused) return;
+
+            const oran = Math.min((zaman - baslangic) / 2000, 1);
+            muzik.volume = 0.25 * oran;
+
+            if (oran < 1) {
+                requestAnimationFrame(sesiAc);
+            }
+        }
+
+        requestAnimationFrame(sesiAc);
+    }).catch(hata => {
+        console.warn('Uçuş müziği başlatılamadı:', hata);
+    });
+}
+
+function ucusMuziginiDurdur() {
+    const muzik = document.getElementById('ucusFonMuzigi');
+    if (!muzik || muzik.paused) return;
+
+    const baslangicSes = muzik.volume;
+    const baslangicZamani = performance.now();
+
+    function sesiKapat(zaman) {
+        const oran = Math.min((zaman - baslangicZamani) / 4000, 1);
+        muzik.volume = baslangicSes * (1 - oran);
+
+        if (oran < 1) {
+            requestAnimationFrame(sesiKapat);
+        } else {
+            muzik.pause();
+            muzik.currentTime = 0;
+        }
+    }
+
+    requestAnimationFrame(sesiKapat);
+}
+
 
 
 function ucusAnimasyonunuBaslat(rota, ayarlar) {
@@ -1243,6 +1294,7 @@ function ucusAnimasyonunuBaslat(rota, ayarlar) {
 					});
 
 					ucusBaslatildi = false;
+					ucusMuziginiDurdur();
 					cancelAnimationFrame(kronometreFrame);
 					ucusAnimasyonFrame = null;
 					ucusKaydiniDurdur();
@@ -1680,6 +1732,8 @@ document.getElementById('ucus-baslat-btn').addEventListener('click', () => {
     ucusRotalari = rotalar;
     ucusBaslatildi = true;
 
+	setTimeout(ucusMuziginiBaslat, 2000);
+
     ucusAnimasyonunuBaslat(ucusRotalari, ayarlar);
 });
 
@@ -1707,6 +1761,8 @@ document.getElementById('ucus-baslat-webm-btn').addEventListener('click', async 
 
         ucusRotalari = rotalar;
         ucusBaslatildi = true;
+
+		setTimeout(ucusMuziginiBaslat, 2000);
 
         ucusAnimasyonunuBaslat(ucusRotalari, ayarlar);
     } catch (hata) {
