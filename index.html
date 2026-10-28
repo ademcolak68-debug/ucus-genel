@@ -2793,11 +2793,14 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
     const repo = 'adem-colak68-debug/ucus-genel';
     const apiUrl = `https://api.github.com/repos/${repo}/contents/`;
 
+    let secimModal = null;
+
     try {
+        // GitHub klasöründeki dosyaları bul.
         const cevap = await fetch(apiUrl);
 
         if (!cevap.ok) {
-            throw new Error('GitHub klasörü okunamadı.');
+            throw new Error('GitHub klasörü okunamadı: ' + cevap.status);
         }
 
         const dosyalar = await cevap.json();
@@ -2812,31 +2815,36 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
             return;
         }
 
-        const secim = document.createElement('select');
-        secim.style.cssText = 'width:100%;padding:10px;margin:10px 0;';
+        // GitHub JSON dosyalarını seçmek için pencere oluştur.
+        secimModal = document.createElement('div');
+        secimModal.style.cssText = `
+            position:fixed;inset:0;z-index:99999;
+            background:rgba(0,0,0,.65);display:flex;
+            align-items:center;justify-content:center;padding:20px;
+        `;
+
+        const kutu = document.createElement('div');
+        kutu.style.cssText = `
+            background:#fff;color:#222;padding:20px;
+            border-radius:8px;width:100%;max-width:420px;
+            box-sizing:border-box;
+        `;
+
+        const baslik = document.createElement('h3');
+        baslik.textContent = 'GitHub Uçuş Dosyası Seç';
+
+        const liste = document.createElement('select');
+        liste.style.cssText = `
+            width:100%;padding:10px;margin:10px 0 15px;
+            box-sizing:border-box;
+        `;
 
         jsonDosyalari.forEach(dosya => {
             const secenek = document.createElement('option');
             secenek.value = dosya.download_url;
             secenek.textContent = dosya.name;
-            secim.appendChild(secenek);
+            liste.appendChild(secenek);
         });
-
-        const modal = document.createElement('div');
-        modal.style.cssText = `
-            position:fixed;inset:0;background:rgba(0,0,0,.6);
-            z-index:99999;display:flex;align-items:center;
-            justify-content:center;padding:20px;
-        `;
-
-        const kutu = document.createElement('div');
-        kutu.style.cssText = `
-            background:white;padding:20px;border-radius:8px;
-            width:100%;max-width:400px;color:#222;
-        `;
-
-        const baslik = document.createElement('h3');
-        baslik.textContent = 'GitHub Uçuş Dosyası Seç';
 
         const ekleBtn = document.createElement('button');
         ekleBtn.textContent = 'Seçilen Dosyayı Ekle';
@@ -2844,25 +2852,26 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
         const iptalBtn = document.createElement('button');
         iptalBtn.textContent = 'İptal';
         iptalBtn.style.marginLeft = '8px';
+        iptalBtn.onclick = () => secimModal.remove();
 
-        kutu.append(baslik, secim, ekleBtn, iptalBtn);
-        modal.appendChild(kutu);
-        document.body.appendChild(modal);
-
-        iptalBtn.onclick = () => modal.remove();
+        kutu.append(baslik, liste, ekleBtn, iptalBtn);
+        secimModal.appendChild(kutu);
+        document.body.appendChild(secimModal);
 
         ekleBtn.onclick = async () => {
             ekleBtn.disabled = true;
 
             try {
-                const dosyaCevap = await fetch(secim.value);
+                // Seçilen JSON dosyasını GitHub'dan oku.
+                const dosyaCevap = await fetch(liste.value);
 
                 if (!dosyaCevap.ok) {
-                    throw new Error('JSON dosyası GitHub üzerinden okunamadı.');
+                    throw new Error('GitHub JSON dosyası okunamadı.');
                 }
 
                 const veri = await dosyaCevap.json();
 
+                // Mevcut JSON doğrulaması.
                 if (
                     veri.format !== 'ennetmax-ucus-projesi' ||
                     veri.version !== 1 ||
@@ -2917,6 +2926,7 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
                     }
                 }
 
+                // Mevcut kayıt anahtarlarına kaydet.
                 localStorage.setItem(
                     UCUS_AYAR_KAYIT_ANAHTARI,
                     JSON.stringify(ayarlar)
@@ -2927,6 +2937,7 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
                     JSON.stringify(veri.tanitimBilgileri)
                 );
 
+                // Mevcut yükleme fonksiyonları.
                 ucusAyarlariniYukle();
 
                 tanitimBilgileri = veri.tanitimBilgileri;
@@ -2937,7 +2948,7 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
                     bilgiSatirlariniGoster();
                 }
 
-                modal.remove();
+                secimModal.remove();
 
                 bildirimGoster(
                     'GitHub uçuş ve tanıtım bilgileri içe aktarıldı.',
@@ -2955,9 +2966,9 @@ document.getElementById('ucus-import-dosya').addEventListener('click', async fun
         };
 
     } catch (hata) {
-        console.error('GitHub dosya listeleme hatası:', hata);
+        console.error('GitHub import hatası:', hata);
         bildirimGoster(
-            'GitHub klasörü okunamadı. Depo erişimini kontrol et.',
+            'GitHub klasörü okunamadı. Depo herkese açık mı kontrol et.',
             'olumsuz'
         );
     }
