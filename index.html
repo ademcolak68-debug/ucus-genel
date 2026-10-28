@@ -8,6 +8,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 	
 
 <style>
@@ -3065,23 +3066,44 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
 
         simge.textContent = '✈';
         simge.style.cssText = `
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            width: 54px;
-            height: 54px;
-            margin-bottom: 10px;
-            border-radius: 16px;
-            background: #eaf2ff;
-            color: #2563eb;
-            font-size: 27px;
-        `;
+		    display: flex;
+		    align-items: center;
+		    justify-content: center;
+		    width: 36px;
+		    height: 36px;
+		    margin-bottom: 6px;
+		    border-radius: 8px;
+		    background: #eaf2ff;
+		    color: #2563eb;
+		    font-size: 19px;
+		`;
 
         // Başlık.
         const baslik = document.createElement('h3');
 
         baslik.textContent = 'Uçuş Dosyası Yükle';
 
+		const kapatBtn = document.createElement('button');
+			kapatBtn.textContent = '×';
+			kapatBtn.type = 'button';
+			kapatBtn.title = 'Kapat';
+			kapatBtn.style.cssText = `
+			    position: absolute;
+			    top: 10px;
+			    right: 12px;
+			    width: 28px;
+			    height: 28px;
+			    padding: 0;
+			    border: 0;
+			    border-radius: 5px;
+			    background: transparent;
+			    color: #64748b;
+			    font-size: 24px;
+			    line-height: 1;
+			    cursor: pointer;
+			`;
+			
+			kapatBtn.addEventListener('click', () => secimModal.remove());
         
 		baslik.style.cssText = `
 		    margin: 0;
@@ -3127,8 +3149,8 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
 		    border-radius: 6px;
 		    background: #ffffff;
 		    color: #1e293b;
-		    font-size: 13px;
-		    font-family: Arial, sans-serif;
+		    font-size: 12px;
+		    font-family: 'Inter', sans-serif;
 		    cursor: pointer;
 		`;
 
@@ -3255,14 +3277,9 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
         // Pencere içeriğini oluştur.
         butonlar.append(iptalBtn, ekleBtn);
 
-        kutu.append(
-            simge,
-            baslik,
-            aciklama,
-            liste,
-            butonlar
-        );
-
+		kutu.style.position = 'relative';
+		kutu.append(simge, baslik, aciklama, liste, butonlar, kapatBtn);
+		
         secimModal.appendChild(kutu);
         document.body.appendChild(secimModal);
 
