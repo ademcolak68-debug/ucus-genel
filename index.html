@@ -2992,82 +2992,101 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                 }
 
           @media (max-width: 480px) {
-		    #ucus-import-modal-kutu {
-		        width: calc(100% - 24px) !important;
-		        max-width: 400px !important;
-		        padding: 0 !important;
-		        border-radius: 10px !important;
-		        background: #ffffff !important;
-		        border: 1px solid #e2e8f0 !important;
-		        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25) !important;
-		        overflow: hidden !important;
-		        box-sizing: border-box !important;
-		    }
-		
-		    #ucus-import-modal-kutu h3 {
-		        margin: 0 !important;
-		        padding: 12px 14px !important;
-		        font-size: 14px !important;
-		        line-height: 1.4 !important;
-		        font-weight: 600 !important;
-		    }
-		
-		    #ucus-import-modal-kutu p {
-		        margin: 0 !important;
-		        padding: 12px 14px 8px !important;
-		        font-size: 12px !important;
-		        line-height: 1.5 !important;
-		    }
-		
-		    #ucus-import-modal-kutu select {
-		        display: block !important;
-		        width: calc(100% - 28px) !important;
-		        min-height: 40px !important;
-		        margin: 0 14px 12px !important;
-		        padding: 8px !important;
-		        box-sizing: border-box !important;
-		        border: 1px solid #cbd5e1 !important;
-		        border-radius: 6px !important;
-		        background: #ffffff !important;
-		        color: #1e293b !important;
-		       font-family: 'Inter', sans-serif !important;
-		        font-size: 12px !important;
-		    }
-		
-		    #ucus-import-modal-butonlar {
-		        display: flex !important;
-		        flex-direction: row !important;
-		        justify-content: flex-end !important;
-		        gap: 8px !important;
-		        padding: 10px 14px !important;
-		        border-top: 1px solid #e2e8f0 !important;
-		    }
-		
-		    #ucus-import-iptal,
-		    #ucus-import-tamam {
-		        flex: 0 1 auto !important;
-		        width: auto !important;
-		        min-width: 70px !important;
-		        min-height: 36px !important;
-		        padding: 8px 12px !important;
-		        border: 0 !important;
-		        border-radius: 5px !important;
-		        font-family: Arial, sans-serif !important;
-		        font-size: 12px !important;
-		        font-weight: 600 !important;
-		        box-shadow: none !important;
-		    }
-		
-		    #ucus-import-iptal {
-		        background: #e2e8f0 !important;
-		        color: #334155 !important;
-		    }
-		
-		    #ucus-import-tamam {
-		        background: #0891b2 !important;
-		        color: #ffffff !important;
-		    }
-		}
+				    #ucus-import-modal-kutu {
+				        width: calc(100vw - 32px) !important;
+				        max-width: 400px !important;
+				        min-width: 0 !important;
+				        padding: 0 !important;
+				        box-sizing: border-box !important;
+				        border-radius: 10px !important;
+				        background: #ffffff !important;
+				        border: 1px solid #e2e8f0 !important;
+				        box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25) !important;
+				        overflow: hidden !important;
+				    }
+				
+				    #ucus-import-modal-kutu h3 {
+				        margin: 0 !important;
+				        padding: 12px 42px 12px 14px !important;
+				        box-sizing: border-box !important;
+				        background: #0f172a !important;
+				        color: #ffffff !important;
+				        font-family: 'Inter', sans-serif !important;
+				        font-size: 14px !important;
+				        line-height: 1.4 !important;
+				        font-weight: 600 !important;
+				    }
+				
+				    #ucus-import-modal-kutu p {
+				        margin: 0 !important;
+				        padding: 12px 14px 8px !important;
+				        box-sizing: border-box !important;
+				        color: #64748b !important;
+				        font-family: 'Inter', sans-serif !important;
+				        font-size: 12px !important;
+				        line-height: 1.5 !important;
+				    }
+				
+				    #ucus-import-modal-kutu select {
+				        display: block !important;
+				        width: calc(100% - 28px) !important;
+				        min-width: 0 !important;
+				        min-height: 40px !important;
+				        margin: 0 14px 12px !important;
+				        padding: 8px !important;
+				        box-sizing: border-box !important;
+				        border: 1px solid #cbd5e1 !important;
+				        border-radius: 6px !important;
+				        background: #ffffff !important;
+				        color: #1e293b !important;
+				        font-family: 'Inter', sans-serif !important;
+				        font-size: 12px !important;
+				    }
+				
+				    #ucus-import-modal-butonlar {
+				        display: flex !important;
+				        flex-direction: row !important;
+				        justify-content: flex-end !important;
+				        align-items: center !important;
+				        gap: 8px !important;
+				        width: 100% !important;
+				        margin: 0 !important;
+				        padding: 10px 14px !important;
+				        box-sizing: border-box !important;
+				        border-top: 1px solid #e2e8f0 !important;
+				    }
+				
+				    #ucus-import-iptal,
+				    #ucus-import-tamam {
+				        display: block !important;
+				        flex: 1 1 0 !important;
+				        width: 0 !important;
+				        min-width: 0 !important;
+				        max-width: 100% !important;
+				        min-height: 36px !important;
+				        margin: 0 !important;
+				        padding: 8px 4px !important;
+				        box-sizing: border-box !important;
+				        border: 0 !important;
+				        border-radius: 5px !important;
+				        font-family: 'Inter', sans-serif !important;
+				        font-size: 12px !important;
+				        font-weight: 600 !important;
+				        line-height: 1.2 !important;
+				        white-space: nowrap !important;
+				        box-shadow: none !important;
+				    }
+				
+				    #ucus-import-iptal {
+				        background: #e2e8f0 !important;
+				        color: #334155 !important;
+				    }
+				
+				    #ucus-import-tamam {
+				        background: #0891b2 !important;
+				        color: #ffffff !important;
+				    }
+				}
             `;
             document.head.appendChild(stil);
         }
