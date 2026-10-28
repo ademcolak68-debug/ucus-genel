@@ -3425,6 +3425,18 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                 liste.appendChild(secenek);
             });
 
+		const dosyaSayisi = document.createElement('p');
+
+		dosyaSayisi.textContent = jsonDosyalari.length + ' dosya bulundu.';
+		dosyaSayisi.style.cssText = `
+		    margin: -6px 16px 12px;
+		    font-family: 'Inter', sans-serif;
+		    font-size: 11px;
+		    color: #64748b;
+		`;
+		
+		liste.insertAdjacentElement('afterend', dosyaSayisi);
+
         // Buton alanı.
         const butonlar = document.createElement('div');
 
@@ -3441,7 +3453,7 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
 
         iptalBtn.id = 'ucus-import-iptal';
         iptalBtn.type = 'button';
-        iptalBtn.textContent = 'İptal';
+        iptalBtn.textContent = 'Vazgeç';
 
         
 		iptalBtn.style.cssText = `
