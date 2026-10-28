@@ -2875,18 +2875,18 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
         const kutu = document.createElement('div');
 
         kutu.style.cssText = `
-            width: 100%;
-            max-width: 420px;
-            padding: 25px;
-            box-sizing: border-box;
-            background: #ffffff;
-            color: #172033;
-            border: 1px solid rgba(255,255,255,0.7);
-            border-radius: 20px;
-            box-shadow: 0 24px 70px rgba(0,0,0,0.3);
-            font-family: Arial, sans-serif;
-            animation: ucusModalAc 0.2s ease-out;
-        `;
+		    width: 100%;
+		    max-width: 420px;
+		    padding: 16px 22px 22px;
+		    box-sizing: border-box;
+		    background: linear-gradient(145deg, #eef5ff, #ffffff 75%);
+		    color: #172033;
+		    border: 1px solid #d5e3f8;
+		    border-radius: 20px;
+		    box-shadow: 0 24px 70px rgba(0,0,0,0.3);
+		    font-family: Arial, sans-serif;
+		    animation: ucusModalAc 0.2s ease-out;
+		`;
 
         // Animasyon.
         if (!document.getElementById('ucus-import-modal-css')) {
@@ -2914,22 +2914,70 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                     transform: scale(0.98);
                 }
 
-                @media (max-width: 480px) {
-                    #ucus-import-modal-kutu {
-                        padding: 21px !important;
-                        border-radius: 18px !important;
-                    }
-
-                    #ucus-import-modal-butonlar {
-                        flex-direction: column-reverse !important;
-                    }
-
-                    #ucus-import-tamam,
-                    #ucus-import-iptal {
-                        width: 100% !important;
-                        min-height: 52px !important;
-                    }
-                }
+               @media (max-width: 480px) {
+				    #ucus-import-modal-kutu {
+				        padding: 12px 18px 18px !important;
+				        border-radius: 18px !important;
+				        background: linear-gradient(
+				            145deg,
+				            #dceaff 0%,
+				            #f0f5ff 45%,
+				            #ffffff 100%
+				        ) !important;
+				        border: 1px solid #c7dafa !important;
+				        box-shadow: 0 18px 45px rgba(20, 50, 100, 0.28) !important;
+				    }
+				
+				    #ucus-import-modal-kutu h3 {
+				        margin-top: 0 !important;
+				        margin-bottom: 6px !important;
+				        font-size: 20px !important;
+				    }
+				
+				    #ucus-import-modal-kutu p {
+				        margin-top: 0 !important;
+				        margin-bottom: 14px !important;
+				        font-size: 13px !important;
+				    }
+				
+				    #ucus-import-modal-kutu select {
+				        margin-top: 0 !important;
+				        margin-bottom: 16px !important;
+				        min-height: 52px !important;
+				        border-radius: 11px !important;
+				        background-color: rgba(255, 255, 255, 0.9) !important;
+				        border-color: #bfd2ef !important;
+				        font-size: 14px !important;
+				    }
+				
+				    #ucus-import-modal-butonlar {
+				        flex-direction: column-reverse !important;
+				        gap: 10px !important;
+				    }
+				
+				    #ucus-import-tamam,
+				    #ucus-import-iptal {
+				        width: 100% !important;
+				        min-height: 54px !important;
+				        padding: 15px 20px !important;
+				        border-radius: 12px !important;
+				        font-size: 15px !important;
+				    }
+				
+				    #ucus-import-tamam {
+				        background: linear-gradient(
+				            135deg,
+				            #2563eb,
+				            #1d4ed8
+				        ) !important;
+				        box-shadow: 0 5px 14px rgba(37, 99, 235, 0.25) !important;
+				    }
+				
+				    #ucus-import-iptal {
+				        background: rgba(255, 255, 255, 0.85) !important;
+				        border-color: #cbd5e1 !important;
+				    }
+				}
             `;
             document.head.appendChild(stil);
         }
@@ -2946,7 +2994,7 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
             justify-content: center;
             width: 54px;
             height: 54px;
-            margin-bottom: 16px;
+            margin-bottom: 10px;
             border-radius: 16px;
             background: #eaf2ff;
             color: #2563eb;
@@ -2980,11 +3028,6 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
         `;
 
         // Select alanı etiketi.
-        const etiket = document.createElement('label');
-
-        etiket.textContent = 'DOSYA ADI';
-
-        etiket.htmlFor = 'ucus-import-modal-select';
 
         etiket.style.cssText = `
             display: block;
@@ -3138,7 +3181,6 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
             simge,
             baslik,
             aciklama,
-            etiket,
             liste,
             butonlar
         );
