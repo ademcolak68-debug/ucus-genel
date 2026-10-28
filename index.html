@@ -2271,9 +2271,19 @@ geojsonEkleBtn.addEventListener('click', async function () {
                     <button type="button" id="geojson-github-kapat" style="border:0;background:none;color:white;font-size:24px;cursor:pointer">×</button>
                 </div>
                 <div style="padding:16px">
-                    <select id="geojson-github-dosyalar" style="box-sizing:border-box;width:100%;padding:10px;border:1px solid #cbd5e1;border-radius:5px;font-size:13px">
-                        <option value="">GitHub dosyaları yükleniyor...</option>
-                    </select>
+                    
+				<div id="geojson-github-dosyalar" style="position:relative;width:100%;font-size:13px">
+				    <button type="button" id="geojson-github-secim-btn"
+				        style="box-sizing:border-box;width:100%;padding:11px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;color:#334155;text-align:left;display:flex;justify-content:space-between;align-items:center;cursor:pointer">
+				        <span id="geojson-github-secim-yazi">GitHub dosyaları yükleniyor...</span>
+				        <span style="margin-left:10px">▾</span>
+				    </button>
+				    <div id="geojson-github-secim-liste"
+				        style="display:none;position:absolute;top:calc(100% + 5px);left:0;right:0;max-height:220px;overflow-y:auto;background:#fff;border:1px solid #cbd5e1;border-radius:8px;box-shadow:0 8px 24px #0002;z-index:10010">
+				    </div>
+				    <input type="hidden" id="geojson-github-secim-deger" value="">
+				</div>
+
                     <div id="geojson-github-mesaj" style="margin-top:9px;font-size:11px;color:#64748b"></div>
                 </div>
                 <div style="padding:12px 16px;border-top:1px solid #e2e8f0;display:flex;justify-content:flex-end;gap:8px">
@@ -2324,20 +2334,73 @@ geojsonEkleBtn.addEventListener('click', async function () {
             /\.(geojson|json)$/i.test(d.name)
         );
 
-        liste.innerHTML = '';
-
-        if (!geojsonDosyalari.length) {
-            liste.innerHTML = '<option value="">GeoJSON dosyası bulunamadı</option>';
-            mesaj.textContent = 'veriler klasöründe GeoJSON veya JSON dosyası bulunamadı.';
-            return;
-        }
-
-        geojsonDosyalari.forEach((dosya, index) => {
-            const secenek = document.createElement('option');
-            secenek.value = String(index);
-            secenek.textContent = dosya.name;
-            liste.appendChild(secenek);
-        });
+        const secimBtn = secimKutusu.querySelector('#geojson-github-secim-btn');
+		const secimYazi = secimKutusu.querySelector('#geojson-github-secim-yazi');
+		const secimListe = secimKutusu.querySelector('#geojson-github-secim-liste');
+		const secimDeger = secimKutusu.querySelector('#geojson-github-secim-deger');
+		
+		secimListe.innerHTML = '';
+		secimDeger.value = '';
+		secimYazi.textContent = 'Bir GeoJSON dosyası seçin';
+		secimBtn.disabled = false;
+		
+		if (!geojsonDosyalari.length) {
+		    secimYazi.textContent = 'Dosya bulunamadı';
+		    mesaj.textContent = 'veriler klasöründe GeoJSON veya JSON dosyası bulunamadı.';
+		    ekleBtn.disabled = true;
+		    return;
+		}
+		
+		geojsonDosyalari.forEach((dosya, index) => {
+		    const secenek = document.createElement('button');
+		    secenek.type = 'button';
+		    secenek.textContent = dosya.name;
+		
+		    Object.assign(secenek.style, {
+		        display: 'block',
+		        width: '100%',
+		        padding: '10px 12px',
+		        border: '0',
+		        borderBottom: '1px solid #e2e8f0',
+		        background: '#fff',
+		        color: '#334155',
+		        textAlign: 'left',
+		        fontSize: '13px',
+		        cursor: 'pointer'
+		    });
+		
+		    secenek.addEventListener('mouseenter', () => {
+		        secenek.style.background = '#e0f2fe';
+		    });
+		
+		    secenek.addEventListener('mouseleave', () => {
+		        secenek.style.background =
+		            secimDeger.value === String(index) ? '#cffafe' : '#fff';
+		    });
+		
+		    secenek.addEventListener('click', () => {
+		        secimDeger.value = String(index);
+		        secimYazi.textContent = dosya.name;
+		        secimListe.style.display = 'none';
+		
+		        Array.from(secimListe.children).forEach((oge, i) => {
+		            oge.style.background =
+		                i === index ? '#cffafe' : '#fff';
+		        });
+		
+		        mesaj.textContent = 'Seçilen dosya: ' + dosya.name;
+		    });
+		
+		    secimListe.appendChild(secenek);
+		});
+		
+		secimBtn.onclick = () => {
+		    secimListe.style.display =
+		        secimListe.style.display === 'block' ? 'none' : 'block';
+		};
+		
+		mesaj.textContent = geojsonDosyalari.length + ' dosya bulundu.';
+		ekleBtn.disabled = false;
 
         mesaj.textContent = geojsonDosyalari.length + ' dosya bulundu.';
         ekleBtn.disabled = false;
@@ -2350,7 +2413,9 @@ geojsonEkleBtn.addEventListener('click', async function () {
     }
 
     ekleBtn.onclick = async () => {
-        const secilenIndex = liste.value;
+        const secilenIndex = secimKutusu.querySelector(
+		    '#geojson-github-secim-deger'
+		).value;
 
         if (secilenIndex === '') {
             mesaj.textContent = 'Önce bir dosya seç.';
