@@ -8,6 +8,7 @@
     <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
     <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
     <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+	<script src="https://unpkg.com/@tmcw/togeojson@5.8.1/dist/togeojson.umd.js"></script>
 
 <style>
  
@@ -2175,6 +2176,7 @@ function ucusEtiketleriniHaritayaEkle(rota) {
 
 
 
+
 document.getElementById('geojson-ekle-btn').addEventListener('click', async function (event) {
     event.preventDefault();
 
@@ -2182,6 +2184,8 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
     const apiUrl = `https://api.github.com/repos/${repo}/contents/veriler`;
 
     let secimModal = null;
+    let escDinleyici = null;
+    let modalIzleyici = null;
 
     try {
         // GitHub veriler klasörünü oku.
@@ -2206,7 +2210,7 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
             return;
         }
 
-        // BAĞIMSIZ MODAL — uçuş modalından ayrı.
+        // Bağımsız seçim penceresi.
         secimModal = document.createElement('div');
 
         secimModal.style.cssText = `
@@ -2336,8 +2340,8 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
         }
 
         const simge = document.createElement('div');
-
         simge.textContent = '🗺️';
+
         simge.style.cssText = `
             display: flex;
             align-items: center;
@@ -2352,8 +2356,8 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
         `;
 
         const baslik = document.createElement('h3');
-
         baslik.textContent = 'GeoJSON / KML Ekle';
+
         baslik.style.cssText = `
             margin: 0 0 9px;
             font-size: 21px;
@@ -2363,7 +2367,6 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
         `;
 
         const aciklama = document.createElement('p');
-
         aciklama.textContent =
             'GitHub veriler klasöründen haritaya eklenecek dosyayı seçin.';
 
@@ -2459,44 +2462,53 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
             transition: transform 0.15s, background 0.15s;
         `;
 
+        let modalKapatildi = false;
+
         const modalKapat = () => {
+            if (modalKapatildi) return;
+            modalKapatildi = true;
+
             if (secimModal?.isConnected) {
                 secimModal.remove();
+            }
+
+            if (escDinleyici) {
+                document.removeEventListener('keydown', escDinleyici);
+            }
+
+            if (modalIzleyici) {
+                modalIzleyici.disconnect();
             }
         };
 
         iptalBtn.onclick = modalKapat;
 
         secimModal.addEventListener('click', e => {
-            if (e.target === secimModal) modalKapat();
+            if (e.target === secimModal) {
+                modalKapat();
+            }
         });
 
-        const escDinleyici = e => {
-            if (e.key === 'Escape' && secimModal?.isConnected) {
+        escDinleyici = e => {
+            if (e.key === 'Escape') {
                 modalKapat();
             }
         };
 
         document.addEventListener('keydown', escDinleyici);
 
-        const modalIzleyici = new MutationObserver(() => {
-            if (!secimModal.isConnected) {
-                document.removeEventListener('keydown', escDinleyici);
-                modalIzleyici.disconnect();
-            }
-        });
-
-        modalIzleyici.observe(document.body, { childList: true });
-
         butonlar.append(iptalBtn, ekleBtn);
         kutu.append(simge, baslik, aciklama, liste, butonlar);
         secimModal.appendChild(kutu);
         document.body.appendChild(secimModal);
 
-        // Seçilen dosyayı al ve mevcut harita gösterimini gerçekleştir.
+        // Dosya seçimi ve haritaya ekleme.
         ekleBtn.onclick = async () => {
             if (!liste.value) {
-                bildirimGoster('Lütfen önce bir dosya adı seçin.', 'olumsuz');
+                bildirimGoster(
+                    'Lütfen önce bir dosya adı seçin.',
+                    'olumsuz'
+                );
                 liste.focus();
                 return;
             }
@@ -2513,7 +2525,11 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                     dosya => dosya.download_url === liste.value
                 );
 
-                const dosyaCevap = await fetch(liste.value);
+                if (!secilenDosya) {
+                    throw new Error('Seçilen dosya bulunamadı.');
+                }
+
+                const dosyaCevap = await fetch(secilenDosya.download_url);
 
                 if (!dosyaCevap.ok) {
                     throw new Error('Seçilen dosya GitHub üzerinden okunamadı.');
@@ -2521,10 +2537,10 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
 
                 let veri;
 
-                if (secilenDosya.name.toLowerCase().endsWith('.kml')) {
+                if (/\.kml$/i.test(secilenDosya.name)) {
                     if (!window.toGeoJSON?.kml) {
                         throw new Error(
-                            'KML dönüştürücü yüklenmemiş. HTML dosyasındaki toGeoJSON script satırını kontrol edin.'
+                            'KML dönüştürücü yüklenmemiş. toGeoJSON script satırını kontrol edin.'
                         );
                     }
 
@@ -2543,9 +2559,9 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                     veri = await dosyaCevap.json();
                 }
 
-                // GeoJSON biçimini doğrula ve FeatureCollection'a dönüştür.
+                // GeoJSON'u FeatureCollection biçimine getir.
                 if (veri?.type === 'FeatureCollection') {
-                    // Olduğu gibi kullan.
+                    // Mevcut FeatureCollection korunur.
                 } else if (veri?.type === 'Feature') {
                     veri = {
                         type: 'FeatureCollection',
@@ -2570,10 +2586,12 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                 }
 
                 if (!Array.isArray(veri.features) || veri.features.length === 0) {
-                    throw new Error('Dosyada haritaya eklenecek özellik bulunamadı.');
+                    throw new Error(
+                        'Dosyada haritaya eklenecek özellik bulunamadı.'
+                    );
                 }
 
-                // Önceki halo animasyonunu durdur.
+                // Önceki animasyonu durdur.
                 if (window.parselHaloAnimasyonu) {
                     cancelAnimationFrame(window.parselHaloAnimasyonu);
                     window.parselHaloAnimasyonu = null;
@@ -2585,14 +2603,16 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                     'hedef-parsel-halo',
                     'hedef-parsel-dolgu'
                 ].forEach(id => {
-                    if (map.getLayer(id)) map.removeLayer(id);
+                    if (map.getLayer(id)) {
+                        map.removeLayer(id);
+                    }
                 });
 
                 if (map.getSource('hedef-parsel-geojson')) {
                     map.removeSource('hedef-parsel-geojson');
                 }
 
-                // GeoJSON kaynağı ve mevcut görsel katmanlar.
+                // Mevcut harita katmanları.
                 map.addSource('hedef-parsel-geojson', {
                     type: 'geojson',
                     data: veri
@@ -2631,7 +2651,7 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                     }
                 });
 
-                // Tüm geometrilerin koordinatlarından harita sınırını hesapla.
+                // Harita sınırlarını hesapla.
                 const koordinatlar = [];
 
                 function koordinatlariTopla(deger) {
@@ -2672,28 +2692,33 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
                     duration: 1800
                 });
 
-                // Mevcut turkuaz halo animasyonu.
+                // Sürekli genişleyip daralan halo animasyonu.
                 let baslangic = null;
 
                 function haloAnimasyonu(zaman) {
-                    if (!baslangic) baslangic = zaman;
+                    if (!map.getLayer('hedef-parsel-halo')) {
+                        window.parselHaloAnimasyonu = null;
+                        return;
+                    }
+
+                    if (!baslangic) {
+                        baslangic = zaman;
+                    }
 
                     const faz = ((zaman - baslangic) % 1400) / 1400;
                     const dalga = (Math.sin(faz * Math.PI * 2) + 1) / 2;
 
-                    if (map.getLayer('hedef-parsel-halo')) {
-                        map.setPaintProperty(
-                            'hedef-parsel-halo',
-                            'line-width',
-                            7 + dalga * 7
-                        );
+                    map.setPaintProperty(
+                        'hedef-parsel-halo',
+                        'line-width',
+                        7 + dalga * 7
+                    );
 
-                        map.setPaintProperty(
-                            'hedef-parsel-halo',
-                            'line-opacity',
-                            0.4 + dalga * 0.55
-                        );
-                    }
+                    map.setPaintProperty(
+                        'hedef-parsel-halo',
+                        'line-opacity',
+                        0.4 + dalga * 0.55
+                    );
 
                     window.parselHaloAnimasyonu =
                         requestAnimationFrame(haloAnimasyonu);
@@ -2736,54 +2761,6 @@ document.getElementById('geojson-ekle-btn').addEventListener('click', async func
     }
 });
 
-        // Sürekli genişleyip daralan halo animasyonu
-        let baslangicZamani = null;
-
-        function haloAnimasyonunuCalistir(zaman) {
-            if (!map.getLayer(haloId)) {
-                window.parselHaloAnimasyonu = null;
-                return;
-            }
-
-            if (baslangicZamani === null) {
-                baslangicZamani = zaman;
-            }
-
-            const oran =
-                ((zaman - baslangicZamani) % 1600) / 1600;
-
-            const parlaklik =
-                (1 - Math.cos(oran * Math.PI * 2)) / 2;
-
-            map.setPaintProperty(
-                haloId,
-                'line-width',
-                7 + parlaklik * 7
-            );
-
-            map.setPaintProperty(
-                haloId,
-                'line-opacity',
-                0.4 + parlaklik * 0.55
-            );
-
-            window.parselHaloAnimasyonu =
-                requestAnimationFrame(haloAnimasyonunuCalistir);
-        }
-
-        window.parselHaloAnimasyonu =
-            requestAnimationFrame(haloAnimasyonunuCalistir);
-
-        console.log('Yüklenen GeoJSON:', veri);
-        bildirimGoster('GeoJSON haritaya eklendi: ' + dosya.name, 'olumlu');
-
-    } catch (hata) {
-        console.error('GeoJSON yükleme hatası:', hata);
-        bildirimGoster('GeoJSON haritaya eklendi: ' + dosya.name, 'olumlu');
-    }
-
-    this.value = '';
-});
 
 
 (function () {
