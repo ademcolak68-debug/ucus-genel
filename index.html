@@ -2410,6 +2410,12 @@ geojsonEkleBtn.addEventListener('click', async function () {
 
         liste.innerHTML = '';
 
+		const varsayilanSecenek = document.createElement('option');
+		varsayilanSecenek.value = '';
+		varsayilanSecenek.textContent = 'Dosya adı seçin';
+		varsayilanSecenek.selected = true;
+		liste.appendChild(varsayilanSecenek);
+
         if (!geojsonDosyalari.length) {
             liste.innerHTML = '<option value="">GeoJSON dosyası bulunamadı</option>';
             mesaj.textContent = 'veriler klasöründe GeoJSON veya JSON dosyası bulunamadı.';
