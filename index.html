@@ -1,0 +1,2899 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Ennetmax - 3D Drone Uçuş Simülasyonu</title>
+    <meta name="viewport" content="initial-scale=1,maximum-scale=1,user-scalable=no">
+
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.js"></script>
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.15.0/mapbox-gl.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+<style>
+ 
+/* =========================================================
+   1. TEMEL SAYFA VE HARİTA
+   ========================================================= */
+
+body {
+    margin: 0;
+    padding: 0;
+}
+
+#map {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 100%;
+}
+
+
+/* =========================================================
+   2. ÜST BİLDİRİM ALANI
+   ========================================================= */
+
+/* Bildirimlerin ekranda konumlandırılması */
+#ust-bildirim-alani {
+    position: fixed;
+    top: 16px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    max-width: calc(100vw - 24px);
+    pointer-events: none;
+}
+
+/* Bildirim kutusu */
+.ust-bildirim {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: fit-content;
+    max-width: 100%;
+    box-sizing: border-box;
+    padding: 4px 8px;
+    border-radius: 3px;
+    background: #F2F4F7;
+    color: #263445;
+    border: 1px solid #D1D5DB;
+    box-shadow: 0 5px 18px rgba(0, 0, 0, 0.35);
+    font-family: Tahoma, sans-serif;
+    font-size: 12px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: opacity .25s ease, transform .25s ease;
+}
+
+/* Bildirimin görünür hâle gelmesi */
+.ust-bildirim.goster {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+/* Bildirim simgesi */
+.bildirim-simge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    width: 16px;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+/* Bildirim türlerine göre simge renkleri */
+.ust-bildirim.olumlu .bildirim-simge {
+    color: #4ade80;
+}
+
+.ust-bildirim.bilgi .bildirim-simge {
+    color: #60a5fa;
+}
+
+.ust-bildirim.uyari .bildirim-simge {
+    color: #fbbf24;
+}
+
+.ust-bildirim.olumsuz .bildirim-simge {
+    color: #f87171;
+}
+
+
+/* =========================================================
+   3. SİNEMATİK SÜRE GÖSTERGESİ
+   ========================================================= */
+
+#cinematic-timer {
+    position: absolute;
+    right: 85px;
+    bottom: 12px;
+    background: #444444;
+    color: #fff;
+    padding: 3px 6px;
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+    z-index: 1000;
+    pointer-events: none;
+    letter-spacing: .3px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* =========================================================
+   4. UÇUŞ MODALI VE ANA KART
+   ========================================================= */
+
+/* Uçuş penceresinin genel konumu */
+.ucus-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    padding: 10px;
+    background: transparent;
+    pointer-events: none;
+    font-family: Arial, sans-serif;
+}
+
+/* Uçuş ayar kartı */
+.ucus-modal-kart {
+    width: 250px;
+    max-width: 94vw;
+    max-height: 80vh;
+    overflow-y: auto;
+    padding: 9px;
+    border-radius: 7px;
+    background: rgba(17, 24, 39, 0.96);
+    color: #fff;
+    pointer-events: auto;
+}
+
+/* Uçuş kartı başlıkları */
+.ucus-modal-kart h2 {
+    margin: 0 0 6px;
+    font-size: 15px;
+}
+
+.ucus-modal-kart h3 {
+    margin: 5px 0;
+    color: #38bdf8;
+    font-size: 12px;
+}
+
+/* Durak ekleme ve uçuş başlatma butonlarının temel stili */
+#durak-ekle-btn,
+#ucus-baslat-btn {
+    width: 100%;
+    padding: 7px;
+    margin-top: 5px;
+    border: 0;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: normal;
+}
+
+/* Durak ekleme butonu */
+#durak-ekle-btn {
+    background: #374151;
+    color: white;
+}
+
+/* Normal uçuş butonunun temel rengi */
+#ucus-baslat-btn {
+    background: #0284c7;
+    color: white;
+}
+
+
+/* =========================================================
+   5. ROTA KARTLARI VE DURAK GİRİŞLERİ
+   ========================================================= */
+
+/* Her bir rota kartı */
+.rota-kart {
+    padding: 7px;
+    margin-bottom: 6px;
+    border: 1px solid #374151;
+    border-radius: 5px;
+}
+
+/* Durak başlığı */
+.durak-baslik {
+    margin: 0 0 5px;
+    color: #38bdf8;
+    font-size: 12px;
+}
+
+/* Rota kartındaki alan etiketleri */
+.rota-kart label {
+    display: block;
+    margin-top: 5px;
+    margin-bottom: 2px;
+    font-size: 10px;
+}
+
+/* Rota kartındaki metin girişleri */
+.rota-kart input {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 6px;
+    font-size: 11px;
+    border: 1px solid #4b5563;
+    border-radius: 4px;
+    background: #1f2937;
+    color: white;
+}
+
+/* Durak silme butonu */
+.durak-sil-btn {
+    margin-top: 6px;
+    padding: 5px 8px;
+    border: 1px solid #ef4444;
+    border-radius: 4px;
+    background: #7f1d1d;
+    color: white;
+    font-size: 10px;
+    cursor: pointer;
+}
+
+
+/* =========================================================
+   6. KAMERA AYARLARI
+   ========================================================= */
+
+/* Kamera ayarlarının iki sütunlu düzeni */
+.kamera-ayar {
+    display: grid;
+    grid-template-columns: 1fr 90px;
+    gap: 5px 8px;
+    align-items: center;
+    padding: 7px;
+    margin-bottom: 8px;
+    background: #1f2937;
+    border-radius: 5px;
+}
+
+/* Kamera ayarı etiketleri */
+.kamera-ayar label {
+    font-size: 11px;
+}
+
+/* Kamera ayarı girişleri */
+.kamera-ayar input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 5px;
+    border: 1px solid #4b5563;
+    border-radius: 4px;
+    background: #111827;
+    color: white;
+    font-size: 11px;
+}
+
+
+/* =========================================================
+   7. UÇUŞ AYARLARI VE PROJE YÖNETİMİ BUTONLARI
+   ========================================================= */
+
+/* Uçuş ayar butonlarını yan yana dizer */
+.ucus-ayar-butonlari {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* Uçuş ayar butonlarının ortak görünümü */
+.ucus-ayar-butonlari button {
+    display: block;
+    flex: 1;
+    min-width: 0;
+    margin: 0;
+    padding: 8px 2px;
+    border: none;
+    border-radius: 5px;
+    background: #2563eb;
+    color: #fff;
+    font-size: 10px;
+    font-weight: normal;
+    line-height: 1.2;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+/* Uçuş ayarlarını yükleme butonu */
+.ucus-ayar-butonlari #ucus-ayar-yukle-btn {
+    background: #475569;
+}
+
+/* Uçuş bilgilerini silme butonu */
+.ucus-ayar-butonlari #ucus-bilgileri-sil-btn {
+    background: #dc2626;
+}
+
+/* GeoJSON ekleme ve bilgi düzenleme butonları */
+#geojson-ekle-btn,
+#bilgiler-duzenle-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 7px;
+    border: 0;
+    border-radius: 4px;
+    background: #374151;
+    color: white;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: normal;
+}
+
+
+/* =========================================================
+   8. UÇUŞ BAŞLATMA BUTONLARI
+   ========================================================= */
+
+.ucus-baslat-butonlari {
+    display: flex !important;
+    flex-direction: row !important;
+    gap: 6px !important;
+    width: 100% !important;
+    margin-top: 8px !important;
+    align-items: center !important;
+}
+
+.ucus-baslat-butonlari button {
+    all: unset !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    flex: 1 !important;
+    height: 30px !important;
+    box-sizing: border-box !important;
+    background-color: #2563eb !important;
+    color: #ffffff !important;
+    font-family: Arial, sans-serif !important;
+    font-size: 10px !important;
+    font-weight: normal !important;
+    border-radius: 5px !important;
+    cursor: pointer !important;
+    text-align: center !important;
+    white-space: nowrap !important;
+}
+
+.ucus-baslat-butonlari button:hover {
+    background-color: #1d4ed8 !important;
+}
+
+/* =========================================================
+   9. BİLGİLER MODALI VE KARTI
+   ========================================================= */
+
+/* Bilgi penceresinin dış alanı */
+#bilgiler-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    background: rgba(0, 0, 0, 0.65);
+    align-items: center;
+    justify-content: center;
+    padding: 12px;
+}
+
+/* Bilgi düzenleme kartı */
+.bilgiler-kart {
+    box-sizing: border-box;
+    width: min(440px, 94vw);
+    max-height: 85vh;
+    overflow-y: auto;
+    padding: 14px;
+    border-radius: 9px;
+    background: #0f172a;
+    color: white;
+    border: 1px solid #38bdf8;
+    box-shadow: 0 15px 40px rgba(0, 0, 0, 0.5);
+}
+
+/* Bilgi kartı başlığı */
+.bilgiler-baslik {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+
+.bilgiler-baslik h3 {
+    margin: 0;
+    font-size: 16px;
+}
+
+/* Bilgi modalını kapatma butonu */
+#bilgi-kapat {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 5px;
+    background: #334155;
+    color: white;
+    font-size: 19px;
+    cursor: pointer;
+}
+
+#bilgi-kapat:hover {
+    background: #dc2626;
+}
+
+
+/* =========================================================
+   10. BİLGİ SATIRLARI VE GİRİŞ ALANLARI
+   ========================================================= */
+
+/* Bilgi satırlarının sütun düzeni */
+.bilgi-satir {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 36px 68px 76px 40px;
+    gap: 5px;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+/* Bilgi satırlarındaki giriş ve seçim alanları */
+.bilgi-satir input,
+.bilgi-satir select {
+    box-sizing: border-box;
+    width: 100%;
+    min-width: 0;
+    height: 32px;
+    padding: 4px;
+    border: 1px solid #475569;
+    border-radius: 4px;
+    background: #1e293b;
+    color: white;
+    font-size: 12px;
+}
+
+/* Bilgi metninin tam satır kaplaması */
+.bilgi-satir .bilgi-metni {
+    grid-column: 1 / -1;
+    height: 34px;
+    padding: 6px 8px;
+    font-size: 13px;
+}
+
+/* Renk seçiciler */
+.bilgi-satir input[type="color"] {
+    height: 32px;
+    padding: 2px;
+}
+
+/* Bilgi satırındaki onay kutusu ve etiketi */
+.bilgi-satir label {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    font-size: 11px;
+    color: #cbd5e1;
+}
+
+.bilgi-satir label input {
+    width: 15px;
+    height: 15px;
+}
+
+
+/* =========================================================
+   11. BİLGİ MODALI ALT BUTONLARI
+   ========================================================= */
+
+/* Alt butonların yan yana dizilmesi */
+.bilgi-modal-butonlar {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+/* Genel alt buton stili */
+.bilgi-modal-butonlar button,
+.bilgi-sil {
+    padding: 8px 10px;
+    border: 0;
+    border-radius: 5px;
+    color: white;
+    background: #334155;
+    font-size: 12px;
+    cursor: pointer;
+}
+
+/* Tamam butonu */
+#bilgi-tamam {
+    margin-left: auto;
+    background: #0284c7;
+}
+
+/* Buton yazılarının tek satırda kalması */
+#bilgi-kapat,
+#bilgi-satir-ekle,
+#bilgi-tamam,
+.bilgi-sil {
+    white-space: nowrap;
+}
+
+/* Tamam butonu üzerine gelindiğinde */
+#bilgi-tamam:hover {
+    background: #0369a1;
+}
+
+/* Silme butonu üzerine gelindiğinde */
+.bilgi-sil:hover {
+    background: #dc2626;
+}
+
+
+/* =========================================================
+   12. BİLGİ MODALI TELEFON EKRANI DÜZENİ
+   ========================================================= */
+
+@media (max-width: 480px) {
+    .bilgiler-kart {
+        width: 94vw;
+        padding: 12px;
+    }
+
+    .bilgi-satir {
+        grid-template-columns: minmax(0, 1fr) 36px 68px 40px;
+        gap: 5px;
+    }
+
+    .bilgi-satir .bilgi-kalinligi {
+        grid-column: 1 / 3;
+    }
+
+    .bilgi-satir .bilgi-sil {
+        grid-column: 4;
+    }
+}
+
+
+/* =========================================================
+   13. UÇUŞ MODALI BAŞLIĞI VE KAPATMA BUTONU
+   ========================================================= */
+
+/* Uçuş kartının konumu ve imleç davranışı */
+#ucus-modal .ucus-modal-kart {
+    position: absolute;
+    cursor: default;
+}
+
+/* Sürüklenebilir başlık */
+#ucus-modal .ucus-modal-kart h2 {
+    cursor: move;
+    user-select: none;
+}
+
+/* Başlık ve kapatma butonunun yerleşimi */
+.ucus-modal-baslik {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.ucus-modal-baslik h2 {
+    margin: 0;
+}
+
+/* Uçuş modalını kapatma butonu */
+#ucus-modal-kapat {
+    flex-shrink: 0;
+    width: 30px;
+    height: 30px;
+    border: none;
+    border-radius: 5px;
+    background: #334155;
+    color: #fff;
+    font-size: 19px;
+    cursor: pointer;
+}
+
+#ucus-modal-kapat:hover {
+    background: #dc2626;
+}
+
+
+/* =========================================================
+   14. UÇUŞ VE BİLGİ MODALLARI KAYDIRMA ÇUBUKLARI
+   ========================================================= */
+
+/* Firefox için ince kaydırma çubuğu */
+#ucus-modal .ucus-modal-kart,
+#bilgiler-modal .bilgiler-kart {
+    scrollbar-width: thin;
+    scrollbar-color: #94a3b8 transparent;
+}
+
+/* Chrome, Edge ve Safari için kaydırma çubuğu genişliği */
+#ucus-modal .ucus-modal-kart::-webkit-scrollbar,
+#bilgiler-modal .bilgiler-kart::-webkit-scrollbar {
+    width: 6px;
+}
+
+/* Kaydırma çubuğunun arka planı */
+#ucus-modal .ucus-modal-kart::-webkit-scrollbar-track,
+#bilgiler-modal .bilgiler-kart::-webkit-scrollbar-track {
+    background: transparent;
+    margin: 10px 0;
+}
+
+/* Kaydırma tutamacı */
+#ucus-modal .ucus-modal-kart::-webkit-scrollbar-thumb,
+#bilgiler-modal .bilgiler-kart::-webkit-scrollbar-thumb {
+    background: #94a3b8;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    background-clip: padding-box;
+}
+
+/* Kaydırma tutamacı üzerine gelindiğinde */
+#ucus-modal .ucus-modal-kart::-webkit-scrollbar-thumb:hover,
+#bilgiler-modal .bilgiler-kart::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+    background-clip: padding-box;
+}
+
+
+/* =========================================================
+   15. ANLIK ZOOM GÖSTERGESİ
+   ========================================================= */
+
+#anlik-zoom {
+    position: absolute;
+    right: 12px;
+    bottom: 12px;
+    background: #444444;
+    color: #fff;
+    padding: 3px 6px;
+    font-family: Arial, sans-serif;
+    font-size: 10px;
+    border-radius: 4px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, .3);
+    z-index: 1000;
+    pointer-events: none;
+    letter-spacing: .3px;
+    border: 1px solid rgba(255, 255, 255, .1);
+    height: 14px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+
+/* =========================================================
+   16. HARİTA LOGOSU
+   ========================================================= */
+
+/* Logo ana kutusu */
+#logo {
+    position: fixed;
+    left: 12px;
+    bottom: 58px;
+    z-index: 1000;
+    width: 110px;
+    height: auto;
+    padding: 5px 5px;
+    background: #444444;
+    box-sizing: border-box;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    text-align: center;
+    border-radius: 0;
+}
+
+/* Logo ana yazısı */
+#logo .logo-ana {
+    margin: 0;
+    padding: 0;
+    font-size: 17px;
+    font-weight: 700;
+    letter-spacing: 0;
+    line-height: 1.2;
+    white-space: nowrap;
+    text-shadow: 1px 1px 1px #555555;
+}
+
+/* Logo altın renkli yazısı */
+#logo .logo-altin {
+    color: #D8CCAE;
+}
+
+/* Logo beyaz yazısı */
+#logo .logo-beyaz {
+    color: #FFFFFF !important;
+    text-shadow: none !important;
+    opacity: 1 !important;
+}
+
+/* Logo alt açıklaması */
+#logo .logo-alt {
+    margin: 0;
+    padding: 0;
+    color: #D8CCAE;
+    font-size: 7px;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+
+/* =========================================================
+   17. UÇUŞ PROJESİ DIŞA AKTARMA VE İÇE AKTARMA
+   ========================================================= */
+
+/* Export ve Import butonlarının ortak stili */
+#ucus-export-btn,
+#ucus-import-btn {
+    flex: 1;
+    min-width: 0;
+    padding: 7px;
+    border: 0;
+    border-radius: 4px;
+    color: #fff;
+    cursor: pointer;
+    font-size: 10px;
+    font-weight: normal;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+
+/* Dışa aktarma butonu */
+#ucus-export-btn {
+    background: #2563eb;
+}
+
+/* İçe aktarma butonu */
+#ucus-import-btn {
+    background: #475569;
+}
+
+/* Dışa aktarma hover rengi */
+#ucus-export-btn:hover {
+    background: #1d4ed8;
+}
+
+/* İçe aktarma hover rengi */
+#ucus-import-btn:hover {
+    background: #334155;
+}
+
+
+	
+</style>
+</head>
+
+<body>
+<div id="map"></div>
+<div id="cinematic-timer">00:00.00</div>
+<div id="anlik-zoom">Zoom: 13.0</div>
+
+<!-- UÇUŞ BİLGİLERİ MODALI -->
+
+<div id="ucus-modal" class="ucus-modal">
+    <div class="ucus-modal-kart">
+        <div class="ucus-modal-baslik">
+			<h2>Uçuş Bilgileri</h2>
+			<button type="button" id="ucus-modal-kapat"
+					title="Kapat">✕</button>
+		</div>
+
+        <h3>Kamera Ayarları</h3>
+
+        <div class="kamera-ayar">
+            <label for="baslangic-zoom">Başlangıç Zoom</label>
+            <input type="number" id="baslangic-zoom"
+                   min="1" max="22" step="0.5" value="17">
+
+            <label for="ucus-zoom">Uçuş Zoom</label>
+            <input type="number" id="ucus-zoom"
+                   min="1" max="22" step="0.5" value="18">
+
+            <label for="kamera-acisi">Kamera Açısı</label>
+            <input type="number" id="kamera-acisi"
+                   min="0" max="85" step="1" value="60">
+
+            <label for="kamera-yonu">Kamera Yönü</label>
+            <input type="number" id="kamera-yonu"
+                   min="0" max="360" step="5" value="0">
+        </div>
+
+        <h3>Rotalar</h3>
+
+        <div id="rota-listesi"></div>
+
+        <button type="button" id="durak-ekle-btn">
+            + Durak Ekle
+        </button>
+				
+		
+		<div class="ucus-ayar-butonlari">
+			<button type="button" id="ucus-ayar-kaydet-btn">Uçuş Kaydet</button>
+			<button type="button" id="ucus-ayar-yukle-btn">Uçuş Yükle</button>
+			<button type="button" id="ucus-bilgileri-sil-btn" onclick="ucusBilgileriniSil()">Bilgileri sil</button>
+		</div>
+		
+		<div style="display:flex; gap:6px; margin-top:6px;">
+			<button type="button" id="geojson-ekle-btn" style="flex:1;">
+				GeoJSON Ekle
+			</button>
+
+			<button type="button" id="bilgiler-duzenle-btn" style="flex:1;">
+				Tanıtım Bilgileri
+			</button>
+		</div>
+
+		<input type="file" id="geojson-dosya-input"
+			   accept=".geojson,.json,application/geo+json,application/json"
+			   style="display:none;">
+			   
+		<div style="display:flex; gap:6px; margin-top:6px;">
+			<button type="button" id="ucus-export-btn" style="flex:1;">
+				Export
+			</button>
+
+			<button type="button" id="ucus-import-btn" style="flex:1;">
+				Import
+			</button>
+		</div>
+		<input type="file" id="ucus-import-dosya"
+		   accept=".json,application/json"
+		   style="display:none;">
+
+
+        <div class="ucus-baslat-butonlari">
+			<button type="button" id="ucus-baslat-btn">Uçuşu Başlat</button>
+			<button type="button" id="ucus-baslat-webm-btn">Videolu Uçuşu Başlat</button>
+		</div>
+    </div>
+</div>
+
+<div id="bilgiler-modal" style="display:none;">
+    <div class="bilgiler-kart">
+
+        <div class="bilgiler-baslik">
+            <h3>Tanıtım Bilgileri</h3>
+            <button type="button" id="bilgi-kapat"
+                    title="Kaydetmeden kapat">✕</button>
+        </div>
+
+        <div id="bilgi-satirlari"></div>
+
+        <div class="bilgi-modal-butonlar">
+            <button type="button" id="bilgi-satir-ekle">+ Satır Ekle</button>
+            <button type="button" id="bilgi-tamam">Tamam</button>
+        </div>
+
+    </div>
+</div>
+
+
+<div id="logo">
+    <div class="logo-ana"><span class="logo-altin">EN</span><span class="logo-beyaz">NET</span><span class="logo-altin">MAX</span></div>
+    <div class="logo-alt">GAYRİMENKUL</div>
+</div>
+
+
+<script>
+mapboxgl.accessToken = 'pk.eyJ1IjoiZ2VvZ3JhcGh5cHJvZiIsImEiOiJjanYxb2t1ZG8wNGU1NGFsNXVkcnhzNmFpIn0.M3qCJK8FYa06B-Irc6FD-g';
+
+
+const rotaListesi = document.getElementById('rota-listesi');
+const durakEkleBtn = document.getElementById('durak-ekle-btn');
+
+function rotaBasliklariniGuncelle() {
+    const kartlar = rotaListesi.querySelectorAll('.rota-kart');
+
+    kartlar.forEach((kart, index) => {
+        kart.querySelector('.durak-baslik').textContent =
+            `${index + 1}. Durak`;
+    });
+}
+
+
+function durakEkle() {
+    const kart = document.createElement('div');
+    kart.className = 'rota-kart';
+
+    kart.innerHTML = `
+        <h4 class="durak-baslik"></h4>
+
+        <label>Durak adı</label>
+        <input type="text"
+               class="durak-adi"
+               placeholder="Örn. Başlangıç Noktası">
+
+        <label>Koordinat (Boylam, Enlem)</label>
+        <div style="display:flex; gap:6px; align-items:center;">
+            <input type="text"
+                   class="durak-koordinat"
+                   placeholder="34.038831, 38.352797"
+                   style="flex:1; min-width:0;">
+
+            <button type="button"
+                    class="haritadan-koordinat-sec"
+                    title="Haritadan koordinat seç"
+                    style="width:24px; min-width:24px; height:24px; padding:0; font-size:16px; line-height:22px; text-align:center; display:flex; align-items:center; justify-content:center; cursor:pointer;">+</button>
+        </div>
+
+        <label>Sonraki durağa uçuş süresi (saniye)</label>
+        <input type="number"
+               class="durak-suresi"
+               min="1"
+               step="1"
+               placeholder="Örn. 15">
+
+        <label>Haritada gösterilecek etiket</label>
+        <input type="text"
+               class="durak-etiket"
+               placeholder="Örn. Başlangıç">
+
+        <button type="button" class="durak-sil-btn">
+            Bu Durağı Sil
+        </button>
+    `;
+
+    kart.querySelector('.durak-sil-btn').addEventListener('click', () => {
+        kart.remove();
+        rotaBasliklariniGuncelle();
+    });
+
+    rotaListesi.appendChild(kart);
+    rotaBasliklariniGuncelle();
+}
+
+
+durakEkleBtn.addEventListener('click', durakEkle);
+
+// Sayfa açıldığında bir boş durak göster.
+durakEkle();
+
+
+
+function rotalariOku() {
+    const kartlar = document.querySelectorAll('#rota-listesi .rota-kart');
+    const rotalar = [];
+
+    for (let i = 0; i < kartlar.length; i++) {
+        const kart = kartlar[i];
+
+        const ad = kart.querySelector('.durak-adi').value.trim();
+        const koordinatMetni = kart.querySelector('.durak-koordinat').value.trim();
+        const sureMetni = kart.querySelector('.durak-suresi').value.trim();
+        const etiket = kart.querySelector('.durak-etiket').value.trim();
+
+        if (!ad || !koordinatMetni) {
+            bildirimGoster(`${i + 1}. durağın adı ve koordinatı girilmelidir.`, 'uyari');
+            return null;
+        }
+
+        const koordinatlar = koordinatMetni.split(',').map(v => Number(v.trim()));
+
+        if (
+            koordinatlar.length !== 2 ||
+            !koordinatlar.every(Number.isFinite) ||
+            koordinatlar[0] < -180 ||
+            koordinatlar[0] > 180 ||
+            koordinatlar[1] < -90 ||
+            koordinatlar[1] > 90
+        ) {
+            bildirimGoster(`${i + 1}. durağın koordinatı hatalı. Örnek: 34.038831, 38.352797`, 'uyari');
+            return null;
+        }
+
+        let sure = null;
+
+        if (i < kartlar.length - 1) {
+            sure = Number(sureMetni);
+
+            if (!sureMetni || !Number.isFinite(sure) || sure <= 0) {
+                bildirimGoster(`${i + 1}. durağın sonraki durağa uçuş süresi saniye olarak girilmelidir.`, 'uyari');
+                return null;
+            }
+        }
+
+        rotalar.push({
+            ad: ad,
+            koordinat: koordinatlar,
+            sure: sure,
+            etiket: etiket
+        });
+    }
+
+    if (rotalar.length < 2) {
+        bildirimGoster('Uçuş için en az iki durak eklemelisin.', 'uyari');
+        return null;
+    }
+
+    return rotalar;
+}
+
+
+
+let ucusRotalari = [];
+let ucusBaslatildi = false;
+
+
+let ucusAnimasyonFrame = null;
+let ucusBaslangicZamani = null;
+let aktifDurakIndex = 0;
+let ucusDurdu = false;
+
+function kameraYonunuHesapla(baslangic, hedef) {
+    return turf.bearing(
+        turf.point(baslangic),
+        turf.point(hedef)
+    );
+}
+
+
+
+function kameraAyarlariniOku() {
+    const baslangicZoom = Number(document.getElementById('baslangic-zoom').value);
+    const ucusZoom = Number(document.getElementById('ucus-zoom').value);
+    const kameraAcisi = Number(document.getElementById('kamera-acisi').value);
+    const kameraYonu = Number(document.getElementById('kamera-yonu').value);
+
+    if (
+        !Number.isFinite(baslangicZoom) ||
+        !Number.isFinite(ucusZoom) ||
+        !Number.isFinite(kameraAcisi) ||
+        !Number.isFinite(kameraYonu) ||
+        baslangicZoom < 1 || baslangicZoom > 22 ||
+        ucusZoom < 1 || ucusZoom > 22 ||
+        kameraAcisi < 0 || kameraAcisi > 85 ||
+        kameraYonu < 0 || kameraYonu > 360
+    ) {
+        bildirimGoster('Kamera ayarlarını kontrol et.', 'uyari');
+        return null;
+    }
+
+    return { baslangicZoom, ucusZoom, kameraAcisi, kameraYonu };
+}
+
+
+
+
+
+function ucusAnimasyonunuBaslat(rota, ayarlar) {
+    if (!rota || rota.length < 2) return;
+	
+	ucusEtiketleriniHaritayaEkle(rota);
+
+    if (ucusAnimasyonFrame) {
+        cancelAnimationFrame(ucusAnimasyonFrame);
+        ucusAnimasyonFrame = null;
+    }
+
+    ucusBaslatildi = true;
+    ucusDurdu = false;
+    aktifDurakIndex = 0;
+
+    const dronePitch = Number(ayarlar.kameraAcisi) || 60;
+    const ucusZoom = Number(ayarlar.ucusZoom) || 19;
+    const baslangicZoom = Number(ayarlar.baslangicZoom) || 17;
+
+    function easeInOutQuad(t) {
+        return t < 0.5
+            ? 2 * t * t
+            : -1 + (4 - 2 * t) * t;
+    }
+
+    function lerp(a, b, t) {
+        return a + (b - a) * t;
+    }
+
+    function lerpBearing(a, b, t) {
+        const fark = ((b - a + 540) % 360) - 180;
+        return a + fark * t;
+    }
+
+    const bacaklar = rota.slice(0, -1).map((durak, i) => ({
+        baslangic: rota[i].koordinat,
+        hedef: rota[i + 1].koordinat,
+        sure: Math.max(0.1, Number(durak.sure) || 10) * 1000,
+        bearingBaslangic: 0,
+        bearingHedef: 0
+    }));
+
+    let toplamUcusSuresi = bacaklar.reduce(
+        (toplam, bacak) => toplam + bacak.sure,
+        0
+    );
+
+    // Her bacağın yönünü ve toplam süre içindeki bitiş oranını hesapla
+    let birikenSure = 0;
+
+    bacaklar.forEach((bacak, i) => {
+        bacak.bearingHedef = kameraYonunuHesapla(
+            bacak.baslangic,
+            bacak.hedef
+        );
+
+        bacak.bearingBaslangic = i === 0
+            ? (Number(ayarlar.kameraYonu) || bacak.bearingHedef)
+            : bacaklar[i - 1].bearingHedef;
+
+        birikenSure += bacak.sure;
+        bacak.bitisOrani = birikenSure / toplamUcusSuresi;
+    });
+
+    map.jumpTo({
+        center: rota[0].koordinat,
+        zoom: baslangicZoom,
+        pitch: dronePitch,
+        bearing: Number(ayarlar.kameraYonu) || bacaklar[0].bearingHedef
+    });
+
+    document.getElementById('ucus-modal').style.display = 'none';
+
+    // Kronometre 5 saniyelik hazırlık süresini de sayar
+    const kronometreBaslangici = performance.now();
+
+    function kronometreGuncelle() {
+        if (!ucusBaslatildi) return;
+
+        const gecen = performance.now() - kronometreBaslangici;
+        const dakika = Math.floor(gecen / 60000);
+        const saniye = Math.floor((gecen % 60000) / 1000);
+        const salise = Math.floor((gecen % 1000) / 10);
+        const ekran = document.getElementById('cinematic-timer');
+
+        if (ekran) {
+            ekran.textContent =
+                `${String(dakika).padStart(2, '0')}:` +
+                `${String(saniye).padStart(2, '0')}.` +
+                `${String(salise).padStart(2, '0')}`;
+        }
+
+        kronometreFrame = requestAnimationFrame(kronometreGuncelle);
+    }
+
+    let kronometreFrame = requestAnimationFrame(kronometreGuncelle);
+
+	setTimeout(() => {
+		if (!ucusBaslatildi) return;
+
+		playSmoothColoredListFlow(tanitimBilgileri, () => {
+			if (!ucusBaslatildi) return;
+
+			const ucusBaslangicZamani = performance.now();
+
+			function frame(zaman) {
+				if (!ucusBaslatildi) return;
+
+				const gecenSure = zaman - ucusBaslangicZamani;
+				let kalanSure = gecenSure;
+				let bacakIndex = 0;
+
+				while (
+					bacakIndex < bacaklar.length - 1 &&
+					kalanSure >= bacaklar[bacakIndex].sure
+				) {
+					kalanSure -= bacaklar[bacakIndex].sure;
+					bacakIndex++;
+				}
+
+				const bacak = bacaklar[bacakIndex];
+				const t = Math.min(1, kalanSure / bacak.sure);
+				const smoothT = easeInOutQuad(t);
+
+				const currentLng = lerp(bacak.baslangic[0], bacak.hedef[0], smoothT);
+				const currentLat = lerp(bacak.baslangic[1], bacak.hedef[1], smoothT);
+				const currentBearing = lerpBearing(
+					bacak.bearingBaslangic,
+					bacak.bearingHedef,
+					smoothT
+				);
+
+				const sonBacak = bacakIndex === bacaklar.length - 1;
+				const zoomT = sonBacak ? smoothT : 0;
+				const currentZoom = lerp(
+					ucusZoom,
+					Math.min(ucusZoom + 1, 20),
+					zoomT
+				);
+
+				aktifDurakIndex = bacakIndex + 1;
+
+				map.jumpTo({
+					center: [currentLng, currentLat],
+					zoom: currentZoom,
+					pitch: dronePitch,
+					bearing: currentBearing
+				});
+
+				if (gecenSure < toplamUcusSuresi) {
+					ucusAnimasyonFrame = requestAnimationFrame(frame);
+				} else {
+					const sonDurak = rota[rota.length - 1];
+
+					map.jumpTo({
+						center: sonDurak.koordinat,
+						zoom: currentZoom,
+						pitch: dronePitch,
+						bearing: bacak.bearingHedef
+					});
+
+					ucusBaslatildi = false;
+					cancelAnimationFrame(kronometreFrame);
+					ucusAnimasyonFrame = null;
+					ucusKaydiniDurdur();
+					
+					setTimeout(function () {
+						document.getElementById('ucus-modal').style.display = 'flex';
+					}, 10000);
+				}
+			}
+
+			ucusAnimasyonFrame = requestAnimationFrame(frame);
+		});
+	}, 5000);
+}
+
+
+function playSmoothColoredListFlow(texts, onComplete) {
+    const mapContainer = map.getContainer();
+
+    // Önceki kart varsa kaldır
+    const eskiKart = document.getElementById('smooth-info-card');
+    if (eskiKart) eskiKart.remove();
+
+    const styleId = 'smooth-info-card-style';
+    if (!document.getElementById(styleId)) {
+        const style = document.createElement('style');
+        style.id = styleId;
+        style.textContent = `
+            #smooth-info-card {
+                position: absolute;
+                top: 32px;
+                left: 40px;
+                z-index: 2000;
+                box-sizing: border-box;
+                min-width: 280px;
+                max-width: min(440px, calc(100% - 32px));
+                padding: 22px 30px;
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                background: rgba(15, 23, 42, .88);
+                backdrop-filter: blur(16px);
+                -webkit-backdrop-filter: blur(16px);
+                border: 1px solid rgba(56, 189, 248, .35);
+                border-left: 5px solid #38bdf8;
+                border-radius: 5px;
+                box-shadow: 0 20px 40px rgba(0, 0, 0, .6);
+                font-family: Arial, sans-serif;
+                color: #fff;
+                pointer-events: none;
+                opacity: 0;
+                transform: translateY(-20px) scale(.96);
+                transition: opacity .8s, transform .8s;
+            }
+
+            #smooth-info-card.card-show {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+
+            #smooth-info-card.card-hide {
+                opacity: 0;
+                transform: translateY(-15px) scale(.96);
+            }
+
+            #smooth-info-card .smooth-line {
+                opacity: 0;
+                transform: translateX(-15px);
+                transition: opacity .5s, transform .5s;
+                letter-spacing: .4px;
+                overflow-wrap: anywhere;
+            }
+
+            #smooth-info-card .smooth-line.line-show {
+                opacity: 1;
+                transform: translateX(0);
+            }
+
+            #smooth-info-card .line-badge {
+                display: inline-block;
+                background: #0284c7;
+                color: #fff;
+                padding: 5px 12px;
+                border-radius: 6px;
+                letter-spacing: 1px;
+            }
+
+            @media (max-width: 480px) {
+                #smooth-info-card {
+                    top: 16px;
+                    left: 16px;
+                    min-width: 0;
+                    max-width: calc(100% - 32px);
+                    padding: 16px 18px;
+                }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const container = document.createElement('div');
+    container.id = 'smooth-info-card';
+    mapContainer.appendChild(container);
+
+    requestAnimationFrame(() => container.classList.add('card-show'));
+
+    let index = 0;
+
+    function processNextLine() {
+        if (!ucusBaslatildi) {
+            container.remove();
+            return;
+        }
+
+        if (index >= texts.length) {
+            setTimeout(() => {
+                container.classList.remove('card-show');
+                container.classList.add('card-hide');
+
+                setTimeout(() => {
+                    container.remove();
+                    if (typeof onComplete === 'function') onComplete();
+                }, 800);
+            }, 1500);
+            return;
+        }
+
+        const item = texts[index];
+        const line = document.createElement('div');
+        line.className = 'smooth-line';
+        line.style.color = item.color || '#ffffff';
+        line.style.fontSize = `${parseFloat(item.size) || 16}px`;
+        line.style.fontWeight = item.weight || '500';
+
+        if (item.isBadge) {
+            const badge = document.createElement('span');
+            badge.className = 'line-badge';
+            badge.style.background = item.color || '#0284c7';
+            badge.textContent = item.text || '';
+            line.appendChild(badge);
+        } else {
+            line.textContent = item.text || '';
+        }
+
+        container.appendChild(line);
+
+        requestAnimationFrame(() => line.classList.add('line-show'));
+
+        index++;
+        setTimeout(processNextLine, 2000);
+    }
+
+    processNextLine();
+}
+
+
+
+
+let ucusKayitRecorder = null;
+let ucusKayitAkis = null;
+let ucusKayitParcalari = [];
+let ucusKayitBaslatiliyor = false;
+
+
+let mp4Donusturucu = null;
+
+console.log('[TEST] FFmpeg dosyaları:', {
+    core: './ffmpeg/core/ffmpeg-core.js',
+    wasm: './ffmpeg/core/ffmpeg-core.wasm',
+    worker: './ffmpeg/ffmpeg/worker.js'
+});
+
+
+async function gercekMp4Olustur(webmBlob) {
+    console.log('[MP4] Dönüştürme fonksiyonu başladı.');
+
+    if (!mp4Donusturucu) {
+        console.log('[MP4] FFmpeg yükleniyor...');
+
+        const { FFmpeg } = await import(
+            './ffmpeg/ffmpeg/index.js'
+        );
+
+        mp4Donusturucu = new FFmpeg();
+
+        mp4Donusturucu.on('log', ({ message }) => {
+            console.log('[FFmpeg]', message);
+        });
+
+        mp4Donusturucu.on('progress', ({ progress }) => {
+            console.log(
+                '[MP4] İlerleme:',
+                Math.round(progress * 100) + '%'
+            );
+        });
+
+                try {
+				const kok = location.origin;
+
+				console.log('[MP4] Core dosyası yükleniyor...');
+
+				await mp4Donusturucu.load({
+					coreURL: kok + '/ffmpeg/core/ffmpeg-core.js?v=esm1',
+					wasmURL: kok + '/ffmpeg/core/ffmpeg-core.wasm',
+					classWorkerURL: kok + '/ffmpeg/ffmpeg/worker.js'
+				});
+
+				console.log('[MP4] FFmpeg hazır.');
+
+			} catch (e) {
+				console.error('[MP4] FFmpeg yükleme hatası:', e);
+				mp4Donusturucu = null;
+				throw e;
+			}
+    }
+
+    console.log('[MP4] WebM dosyası hazırlanıyor...');
+
+    await mp4Donusturucu.writeFile(
+        'ucus.webm',
+        new Uint8Array(await webmBlob.arrayBuffer())
+    );
+
+    console.log('[MP4] H.264 MP4 dönüşümü başladı...');
+
+    await mp4Donusturucu.exec([
+        '-i', 'ucus.webm',
+        '-map', '0:v:0',
+        '-an',
+        '-c:v', 'libx264',
+        '-preset', 'ultrafast',
+        '-crf', '23',
+        '-vf', 'scale=trunc(iw/2)*2:trunc(ih/2)*2',
+        '-pix_fmt', 'yuv420p',
+        '-profile:v', 'baseline',
+        '-level', '3.1',
+        '-tag:v', 'avc1',
+        '-movflags', '+faststart',
+        '-f', 'mp4',
+        'ucus.mp4'
+    ]);
+
+    console.log('[MP4] Sonuç okunuyor...');
+
+    const sonuc = await mp4Donusturucu.readFile('ucus.mp4');
+
+    if (!sonuc || sonuc.length === 0) {
+        throw new Error('Dönüştürülen MP4 dosyası boş.');
+    }
+
+    console.log(
+        '[MP4] Dönüşüm tamamlandı:',
+        Math.round(sonuc.length / 1024),
+        'KB'
+    );
+
+    return new Blob([sonuc], {
+        type: 'video/mp4'
+    });
+}
+
+
+
+
+
+
+
+
+// Çakışmayı önlemek için değişkenleri global scope'ta güvenli tanımlıyoruz
+window.ucusKayitRecorder = window.ucusKayitRecorder || null;
+window.ucusKayitAkis = window.ucusKayitAkis || null;
+window.ucusKayitParcalari = window.ucusKayitParcalari || [];
+window.ucusKayitBaslatiliyor = window.ucusKayitBaslatiliyor || false;
+
+async function ucusKaydiniHazirla() {
+    if (!navigator.mediaDevices?.getDisplayMedia) {
+        bildirimGoster('Tarayıcınız ekran kaydını desteklemiyor.', 'uyari');
+        return;
+    }
+
+    window.ucusKayitBaslatiliyor = true;
+
+    try {
+        window.ucusKayitAkis = await navigator.mediaDevices.getDisplayMedia({
+            video: {
+                displaySurface: "browser",
+                frameRate: { ideal: 30, max: 30 }
+            },
+            audio: false,
+            preferCurrentTab: true
+        });
+
+        window.ucusKayitParcalari = [];
+
+        let secilenTur = 'video/webm';
+        const olasiTurler = [
+			'video/webm;codecs=vp9',
+			'video/webm;codecs=vp8',
+			'video/webm'
+		];
+        for (let tur of olasiTurler) {
+            if (MediaRecorder.isTypeSupported(tur)) {
+                secilenTur = tur;
+                break;
+            }
+        }
+
+        window.ucusKayitRecorder = new MediaRecorder(window.ucusKayitAkis, {
+            mimeType: secilenTur,
+            videoBitsPerSecond: 12000000
+        });
+
+        window.ucusKayitRecorder.ondataavailable = olay => {
+            if (olay.data && olay.data.size > 0) {
+                window.ucusKayitParcalari.push(olay.data);
+            }
+        };
+
+        
+		window.ucusKayitRecorder.onstop = async () => {
+			window.ucusKayitBaslatiliyor = false;
+
+			const kayit = window.ucusKayitRecorder;
+			const kayitTuru = kayit?.mimeType || secilenTur;
+
+			const hamBlob = new Blob(window.ucusKayitParcalari, {
+				type: kayitTuru
+			});
+
+			try {
+				if (!hamBlob.size) {
+					throw new Error('Kayıt verisi boş.');
+				}
+
+				let sonucBlob;
+
+				if (kayitTuru.includes('mp4')) {
+					sonucBlob = hamBlob;
+				} else {
+					console.log('WebM kaydı gerçek MP4 formatına dönüştürülüyor...');
+					sonucBlob = await gercekMp4Olustur(hamBlob);
+				}
+
+				if (!sonucBlob.size) {
+					throw new Error('MP4 dosyası boş oluştu.');
+				}
+
+				const url = URL.createObjectURL(sonucBlob);
+				const link = document.createElement('a');
+
+				link.href = url;
+				link.download = 'ennetmax_ucus_kaydi.mp4';
+
+				document.body.appendChild(link);
+				link.click();
+				link.remove();
+
+				setTimeout(() => URL.revokeObjectURL(url), 60000);
+
+				console.log(
+					'MP4 indirildi:',
+					Math.round(sonucBlob.size / 1024),
+					'KB'
+				);
+
+			} catch (err) {
+				console.error('MP4 dönüşümünün gerçek hatası:', err);
+
+				const webmBlob = new Blob(window.ucusKayitParcalari, {
+					type: kayitTuru
+				});
+
+				if (webmBlob.size > 0) {
+					const url = URL.createObjectURL(webmBlob);
+					const link = document.createElement('a');
+
+					link.href = url;
+					link.download = 'ennetmax_ucus_kaydi.webm';
+
+					document.body.appendChild(link);
+					link.click();
+					link.remove();
+
+					setTimeout(() => URL.revokeObjectURL(url), 60000);
+				}
+
+				bildirimGoster('MP4 dönüşümü başarısız. F12 > Console bölümündeki kırmızı hataya bak.', 'olumsuz');
+			} finally {
+				window.ucusKayitAkis?.getTracks().forEach(track => track.stop());
+
+				window.ucusKayitRecorder = null;
+				window.ucusKayitAkis = null;
+				window.ucusKayitParcalari = [];
+				window.ucusKayitBaslatiliyor = false;
+			}
+		};
+
+
+        window.ucusKayitAkis.getVideoTracks()[0].addEventListener('ended', () => {
+            if (window.ucusKayitRecorder?.state === 'recording') {
+                window.ucusKayitRecorder.stop();
+            }
+        });
+
+        window.ucusKayitRecorder.start(1000);
+
+    } catch (err) {
+        window.ucusKayitBaslatiliyor = false;
+        console.error("Kayıt başlatılamadı:", err);
+    }
+}
+
+function ucusKaydiniDurdur() {
+    window.ucusKayitBaslatiliyor = false;
+    if (window.ucusKayitRecorder && window.ucusKayitRecorder.state === 'recording') {
+        window.ucusKayitRecorder.stop();
+    }
+}
+
+
+
+
+// Normal uçuş: kayıt yok
+document.getElementById('ucus-baslat-btn').addEventListener('click', () => {
+    if (ucusBaslatildi || ucusKayitBaslatiliyor) return;
+	
+	bildirimGoster('Kayıtsız uçuş seçildi.', 'bilgi');
+
+    const rotalar = rotalariOku();
+    if (!rotalar) return;
+
+    const ayarlar = kameraAyarlariniOku();
+    if (!ayarlar) return;
+
+    ucusRotalari = rotalar;
+    ucusBaslatildi = true;
+
+    ucusAnimasyonunuBaslat(ucusRotalari, ayarlar);
+});
+
+// Videolu uçuş: ekran kaydı var
+document.getElementById('ucus-baslat-webm-btn').addEventListener('click', async () => {
+    if (ucusBaslatildi || ucusKayitBaslatiliyor) return;
+	
+	bildirimGoster('Kayıtlı uçuş seçildi. Ekran kaydı başlatılacak.', 'bilgi');
+
+    const rotalar = rotalariOku();
+    if (!rotalar) return;
+
+    const ayarlar = kameraAyarlariniOku();
+    if (!ayarlar) return;
+
+    ucusKayitBaslatiliyor = true;
+
+    try {
+        await ucusKaydiniHazirla();
+
+        // İzin veya kayıt hazırlığı başarısızsa uçuşu başlatma.
+        if (!window.ucusKayitRecorder || !window.ucusKayitAkis) {
+            throw new Error('Ekran kaydı başlatılamadı.');
+        }
+
+        ucusRotalari = rotalar;
+        ucusBaslatildi = true;
+
+        ucusAnimasyonunuBaslat(ucusRotalari, ayarlar);
+    } catch (hata) {
+        console.error('Uçuş kaydı başlatılamadı:', hata);
+        bildirimGoster('Ekran kaydı başlatılamadı veya izin verilmedi. Uçuş başlatılmadı.', 'olumsuz');
+    } finally {
+        ucusKayitBaslatiliyor = false;
+    }
+});
+
+
+
+
+const UCUS_AYAR_KAYIT_ANAHTARI = 'ennetmax_ucus_ayarlari_v1';
+
+function ucusAyarlariniKaydet() {
+    const ayarlar = {
+        baslangicZoom: document.getElementById('baslangic-zoom').value,
+        ucusZoom: document.getElementById('ucus-zoom').value,
+        kameraAcisi: document.getElementById('kamera-acisi').value,
+        kameraYonu: document.getElementById('kamera-yonu').value,
+        duraklar: Array.from(
+            document.querySelectorAll('#rota-listesi .rota-kart')
+        ).map(kart => ({
+            ad: kart.querySelector('.durak-adi').value,
+            koordinat: kart.querySelector('.durak-koordinat').value,
+            sure: kart.querySelector('.durak-suresi').value,
+            etiket: kart.querySelector('.durak-etiket').value
+        }))
+    };
+
+    try {
+        localStorage.setItem(
+			UCUS_AYAR_KAYIT_ANAHTARI,
+			JSON.stringify(ayarlar)
+		);
+
+		// Kaydetme başarılıysa haritadan seçilen geçici markerları kaldır.
+		if (window.ucusSecilenNoktaIsaretcileri) {
+			window.ucusSecilenNoktaIsaretcileri.forEach(marker => {
+				marker.remove();
+			});
+
+			window.ucusSecilenNoktaIsaretcileri = [];
+		}
+
+		bildirimGoster('Uçuş ayarları kaydedildi.', 'olumlu');
+		
+    } catch (hata) {
+        bildirimGoster('Ayarlar kaydedilemedi. Tarayıcı depolama alanını kontrol et.', 'olumsuz');
+    }
+}
+
+function ucusAyarlariniYukle() {
+    const kayit = localStorage.getItem(UCUS_AYAR_KAYIT_ANAHTARI);
+
+    if (!kayit) {
+        bildirimGoster('Kayıtlı uçuş ayarı bulunamadı.', 'bilgi');
+        return;
+    }
+
+    try {
+        const ayarlar = JSON.parse(kayit);
+
+        document.getElementById('baslangic-zoom').value = ayarlar.baslangicZoom ?? 17;
+        document.getElementById('ucus-zoom').value = ayarlar.ucusZoom ?? 18;
+        document.getElementById('kamera-acisi').value = ayarlar.kameraAcisi ?? 60;
+        document.getElementById('kamera-yonu').value = ayarlar.kameraYonu ?? 0;
+
+        rotaListesi.innerHTML = '';
+
+        if (Array.isArray(ayarlar.duraklar) && ayarlar.duraklar.length) {
+            ayarlar.duraklar.forEach(durak => {
+                durakEkle();
+
+                const kartlar = rotaListesi.querySelectorAll('.rota-kart');
+                const kart = kartlar[kartlar.length - 1];
+
+                kart.querySelector('.durak-adi').value = durak.ad ?? '';
+                kart.querySelector('.durak-koordinat').value = durak.koordinat ?? '';
+                kart.querySelector('.durak-suresi').value = durak.sure ?? '';
+                kart.querySelector('.durak-etiket').value = durak.etiket ?? '';
+            });
+        } else {
+            durakEkle();
+        }
+
+        rotaBasliklariniGuncelle();
+        bildirimGoster('Kayıtlı uçuş ayarları yüklendi.', 'olumlu');
+    } catch (hata) {
+        bildirimGoster('Kayıtlı ayarlar okunamadı.', 'olumsuz');
+    }
+}
+
+document.getElementById('ucus-ayar-kaydet-btn')
+    .addEventListener('click', ucusAyarlariniKaydet);
+
+document.getElementById('ucus-ayar-yukle-btn')
+    .addEventListener('click', ucusAyarlariniYukle);
+
+
+function ucusBilgileriniSil() {
+    // Tarayıcı hafızasındaki kayıtlı ayarları sil
+    localStorage.removeItem('ennetmax_ucus_ayarlari_v1');
+
+    // Rota listesini temizle
+    const rotaListesi = document.getElementById('rota-listesi');
+    rotaListesi.innerHTML = '';
+
+    // Bir boş durak oluştur
+    durakEkle();
+
+    // Kamera ayarlarını varsayılan değerlere döndür
+    document.getElementById('baslangic-zoom').value = 17;
+    document.getElementById('ucus-zoom').value = 19;
+    document.getElementById('kamera-acisi').value = 60;
+    document.getElementById('kamera-yonu').value = 0;
+}
+
+
+
+
+
+
+
+
+
+const map = new mapboxgl.Map({
+    container: "map",
+    style: {
+        version: 8,
+        sources: {},
+        layers: [],
+        glyphs: 'https://api.mapbox.com/fonts/v1/mapbox/{fontstack}/{range}.pbf?access_token=' + mapboxgl.accessToken
+    },
+	center: [34.038831, 38.352797],
+    //center: startCoord,
+    zoom: 15,
+    //pitch: dronePitch,
+    //bearing: bearing1,
+    attributionControl: false,
+    //renderWorldCopies: false
+});
+
+
+
+let koordinatSecilecekInput = null;
+
+document.addEventListener('click', function (e) {
+    const buton = e.target.closest('.haritadan-koordinat-sec');
+    if (!buton) return;
+
+    koordinatSecilecekInput =
+        buton.closest('.rota-kart').querySelector('.durak-koordinat');
+
+    document.querySelectorAll('.haritadan-koordinat-sec')
+        .forEach(b => b.classList.remove('aktif'));
+
+    buton.classList.add('aktif');
+	map.getCanvas().style.cursor = 'crosshair';
+	
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' || !koordinatSecilecekInput) return;
+
+    // Koordinat seçme işlemini iptal et
+    koordinatSecilecekInput = null;
+
+    // + butonlarının aktif görünümünü kaldır
+    document.querySelectorAll('.haritadan-koordinat-sec')
+        .forEach(b => b.classList.remove('aktif'));
+
+    // İmleci normale döndür
+    map.getCanvas().style.cursor = '';
+
+    e.preventDefault();
+});
+
+
+
+map.on('click', function (e) {
+    if (!koordinatSecilecekInput) return;
+
+    // Seçilen koordinatı inputa yaz
+    koordinatSecilecekInput.value =
+        `${e.lngLat.lng.toFixed(6)}, ${e.lngLat.lat.toFixed(6)}`;
+
+    koordinatSecilecekInput.dispatchEvent(
+        new Event('input', { bubbles: true })
+    );
+
+    koordinatSecilecekInput.dispatchEvent(
+        new Event('change', { bubbles: true })
+    );
+
+    // Yeni seçilen noktaya işaretçi koy
+    if (!window.ucusSecilenNoktaIsaretcileri) {
+    window.ucusSecilenNoktaIsaretcileri = [];
+	}
+
+	const yeniIsaretci = new mapboxgl.Marker()
+		.setLngLat(e.lngLat)
+		.addTo(map);
+
+	window.ucusSecilenNoktaIsaretcileri.push(yeniIsaretci);
+
+    // Seçim modunu kapat
+    koordinatSecilecekInput = null;
+
+    document.querySelectorAll('.haritadan-koordinat-sec')
+        .forEach(b => b.classList.remove('aktif'));
+
+    map.getCanvas().style.cursor = '';
+
+});
+
+
+
+
+
+
+
+
+map.on('load', () => {
+    
+    // Google uydu altlığı
+    map.addSource('google-tiles', {
+        type: 'raster',
+        tiles: [
+            'https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}'
+        ],
+        tileSize: 256,
+        maxzoom: 24
+    });
+
+    map.addLayer({
+        id: 'google-tiles-layer',
+        type: 'raster',
+        source: 'google-tiles',
+        paint: {
+            'raster-fade-duration': 0
+        }
+    });
+	
+	
+
+    // Sağlık Kasabası yolu
+    map.addSource('saglik-yolu', {
+        type: 'geojson',
+        data: {
+            type: 'Feature',
+            properties: {
+                yol_adi: 'SAĞLIK KASABASI YOLU'
+            },
+            geometry: {
+                type: 'LineString',
+                coordinates: [
+                    [34.042683, 38.352317],
+                    [34.050096, 38.331288]
+                ]
+            }
+        }
+    });
+
+    // Yol çizgisi
+    map.addLayer({
+        id: 'saglik-yolu-line',
+        type: 'line',
+        source: 'saglik-yolu',
+        paint: {
+            'line-color': '#38bdf8',
+            'line-width': 3,
+            'line-opacity': 0.6,
+            'line-dasharray': [2, 2]
+        }
+    });
+
+    // Yol adı: çizgi boyunca ortada bir kez
+    map.addLayer({
+        id: 'saglik-yolu-text',
+        type: 'symbol',
+        source: 'saglik-yolu',
+        layout: {
+            'text-field': ['get', 'yol_adi'],
+            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+            'text-size': 13,
+            'text-letter-spacing': 0.15,
+            'symbol-placement': 'line-center',
+            'text-pitch-alignment': 'viewport',
+            'text-rotation-alignment': 'map',
+            'text-keep-upright': true,
+            'text-allow-overlap': true,
+            'text-ignore-placement': true
+        },
+        paint: {
+            'text-color': '#ffffff',
+            'text-halo-color': '#0f172a',
+            'text-halo-width': 2.5
+        }
+    });
+
+	
+
+  
+});
+
+const zoomGosterge = document.getElementById('anlik-zoom');
+
+function zoomGuncelle() {
+    zoomGosterge.textContent = 'Zoom: ' + map.getZoom().toFixed(1);
+}
+
+map.on('load', zoomGuncelle);
+map.on('zoom', zoomGuncelle);
+
+
+
+// =====================================================
+// DURAK ETİKETLERİ
+// =====================================================
+
+function create3DMarkerWithPulse(coordinates, titleText) {
+    const el = document.createElement('div');
+    el.className = 'sky-universal-label';
+
+    const text = document.createElement('span');
+    text.className = 'label-main';
+
+    // HTML içine ham metin basılmaz; satır sonları güvenli işlenir.
+    String(titleText ?? '')
+        .split(/\\n|\n|\r\n/)
+        .slice(0, 2)
+        .map(s => s.trim())
+        .filter(Boolean)
+        .forEach((line, i) => {
+            if (i > 0) text.appendChild(document.createElement('br'));
+            text.appendChild(document.createTextNode(line));
+        });
+
+    const container = document.createElement('div');
+    container.className = 'marker-container';
+
+    const textContainer = document.createElement('div');
+    textContainer.className = 'text-container';
+    textContainer.appendChild(text);
+
+    const pulseWrapper = document.createElement('div');
+    pulseWrapper.className = 'pulse-wrapper';
+    pulseWrapper.innerHTML = `
+        <div class="pulse-ring"></div>
+        <div class="pulse-core"></div>
+    `;
+
+    container.appendChild(textContainer);
+    container.appendChild(pulseWrapper);
+    el.appendChild(container);
+
+    if (!document.getElementById('universal-marker-style')) {
+        const style = document.createElement('style');
+        style.id = 'universal-marker-style';
+        style.textContent = `
+            .sky-universal-label {
+                pointer-events:none;
+                user-select:none;
+            }
+            .marker-container {
+                display:flex;
+                flex-direction:column;
+                align-items:center;
+                position:relative;
+            }
+            .text-container {
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                animation:universalFloat 3s ease-in-out infinite;
+                margin-bottom:12px;
+            }
+            .label-main {
+                font-family:Arial,sans-serif;
+                font-size:26px;
+                font-weight:800;
+                color:#fff;
+                letter-spacing:0;
+                text-transform:uppercase;
+                display:inline-block;
+                -webkit-text-stroke:1.2px #0f172a;
+                text-shadow:0 2px 4px rgba(15,23,42,.9), 0 6px 14px rgba(0,0,0,.85);
+                text-align:center;
+                line-height:1.4;
+            }
+            .pulse-wrapper {
+                position:relative;
+                width:36px;
+                height:36px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+            }
+            .pulse-core {
+                width:12px;
+                height:12px;
+                background:#38bdf8;
+                border-radius:50%;
+                box-shadow:0 0 12px #38bdf8, inset 0 0 4px rgba(255,255,255,.8);
+                z-index:2;
+            }
+            .pulse-ring {
+                position:absolute;
+                inset:0;
+                margin:auto;
+                width:36px;
+                height:36px;
+                border:2px solid #38bdf8;
+                border-radius:50%;
+                animation:universalPulseWave 2s infinite ease-out;
+                opacity:.8;
+                z-index:1;
+            }
+            @keyframes universalPulseWave {
+                0% { transform:scale(.5); opacity:1; }
+                100% { transform:scale(2.4); opacity:0; }
+            }
+            @keyframes universalFloat {
+                0%,100% { transform:translateY(0); }
+                50% { transform:translateY(-6px); }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    new mapboxgl.Marker({
+        element: el,
+        anchor: 'bottom',
+        pitchAlignment: 'viewport',
+        rotationAlignment: 'viewport'
+    })
+    .setLngLat(coordinates)
+    .addTo(map);
+}
+
+
+function ucusEtiketleriniHaritayaEkle(rota) {
+    // Önceki etiketleri temizle
+    if (window.ucusEtiketMarkerlari) {
+        window.ucusEtiketMarkerlari.forEach(marker => marker.remove());
+    }
+
+    window.ucusEtiketMarkerlari = [];
+
+    rota.forEach(durak => {
+        const etiket = String(durak.etiket || '').trim();
+
+        // Yalnızca etiket alanı doluysa göster
+        if (!etiket) return;
+
+        const marker = create3DMarkerWithPulse(
+            durak.koordinat,
+            etiket
+        );
+
+        if (marker) {
+            window.ucusEtiketMarkerlari.push(marker);
+        }
+    });
+}
+
+
+
+const geojsonEkleBtn = document.getElementById('geojson-ekle-btn');
+const geojsonDosyaInput = document.getElementById('geojson-dosya-input');
+
+geojsonEkleBtn.addEventListener('click', function () {
+    geojsonDosyaInput.click();
+});
+
+geojsonDosyaInput.addEventListener('change', async function () {
+    const dosya = this.files[0];
+    if (!dosya) return;
+
+    try {
+        const geojson = JSON.parse(await dosya.text());
+
+        if (
+            !geojson ||
+            !['FeatureCollection', 'Feature', 'Polygon', 'MultiPolygon', 'GeometryCollection']
+                .includes(geojson.type)
+        ) {
+            throw new Error('Geçerli bir GeoJSON dosyası seçilmedi.');
+        }
+
+        // GeoJSON verisini FeatureCollection biçimine getir
+        let veri = geojson;
+
+        if (geojson.type === 'Polygon' || geojson.type === 'MultiPolygon') {
+            veri = {
+                type: 'FeatureCollection',
+                features: [{
+                    type: 'Feature',
+                    properties: {},
+                    geometry: geojson
+                }]
+            };
+        } else if (geojson.type === 'GeometryCollection') {
+            veri = {
+                type: 'FeatureCollection',
+                features: geojson.geometries.map(geometri => ({
+                    type: 'Feature',
+                    properties: {},
+                    geometry: geometri
+                }))
+            };
+        } else if (geojson.type === 'Feature') {
+            veri = {
+                type: 'FeatureCollection',
+                features: [geojson]
+            };
+        }
+
+        if (
+            !Array.isArray(veri.features) ||
+            veri.features.length === 0
+        ) {
+            throw new Error('GeoJSON içinde gösterilecek geometri bulunamadı.');
+        }
+
+        const kaynakId = 'hedef-parsel-geojson';
+        const dolguId = 'hedef-parsel-dolgu';
+        const haloId = 'hedef-parsel-halo';
+        const sinirId = 'hedef-parsel-sinir';
+
+        // Önceki animasyonu durdur
+        if (window.parselHaloAnimasyonu) {
+            cancelAnimationFrame(window.parselHaloAnimasyonu);
+            window.parselHaloAnimasyonu = null;
+        }
+
+        // Önceki katmanları ve kaynağı kaldır
+        [sinirId, haloId, dolguId].forEach(id => {
+            if (map.getLayer(id)) map.removeLayer(id);
+        });
+
+        if (map.getSource(kaynakId)) {
+            map.removeSource(kaynakId);
+        }
+
+        // GeoJSON kaynağını ekle
+        map.addSource(kaynakId, {
+            type: 'geojson',
+            data: veri
+        });
+
+        // Parsel dolgusu
+        map.addLayer({
+            id: dolguId,
+            type: 'fill',
+            source: kaynakId,
+            filter: [
+                'any',
+                ['==', ['geometry-type'], 'Polygon'],
+                ['==', ['geometry-type'], 'MultiPolygon']
+            ],
+            paint: {
+                'fill-color': '#0284c7',
+                'fill-opacity': 0.25
+            }
+        });
+
+        // Kalın koyu halo
+        map.addLayer({
+            id: haloId,
+            type: 'line',
+            source: kaynakId,
+            filter: [
+                'any',
+                ['==', ['geometry-type'], 'Polygon'],
+                ['==', ['geometry-type'], 'MultiPolygon']
+            ],
+            layout: {
+				'line-join': 'round',
+				'line-cap': 'round'
+			},
+			paint: {
+				'line-color': '#0891b2',
+				'line-width': 10,
+				'line-opacity': 0.95
+			}
+        });
+
+        // Beyaz parsel sınırı
+        map.addLayer({
+            id: sinirId,
+            type: 'line',
+            source: kaynakId,
+            filter: [
+                'any',
+                ['==', ['geometry-type'], 'Polygon'],
+                ['==', ['geometry-type'], 'MultiPolygon']
+            ],
+            layout: {
+				'line-join': 'round',
+				'line-cap': 'round'
+			},
+			paint: {
+				'line-color': '#ffffff',
+				'line-width': 4,
+				'line-opacity': 1
+			}
+        });
+
+        // GeoJSON içindeki bütün koordinatları topla
+        const koordinatlar = [];
+
+        function koordinatlariTara(deger) {
+            if (!Array.isArray(deger)) return;
+
+            if (
+                deger.length >= 2 &&
+                typeof deger[0] === 'number' &&
+                typeof deger[1] === 'number'
+            ) {
+                koordinatlar.push(deger);
+                return;
+            }
+
+            deger.forEach(koordinatlariTara);
+        }
+
+        function geometriKoordinatlariniTara(geometri) {
+            if (!geometri) return;
+
+            if (geometri.type === 'GeometryCollection') {
+                geometri.geometries.forEach(geometriKoordinatlariniTara);
+            } else {
+                koordinatlariTara(geometri.coordinates);
+            }
+        }
+
+        veri.features.forEach(feature => {
+            geometriKoordinatlariniTara(feature.geometry);
+        });
+
+        // Haritayı parsele yaklaştır
+        if (koordinatlar.length > 0) {
+            const sinirlar = new mapboxgl.LngLatBounds();
+
+            koordinatlar.forEach(koordinat => {
+                sinirlar.extend([
+                    koordinat[0],
+                    koordinat[1]
+                ]);
+            });
+
+            map.fitBounds(sinirlar, {
+                padding: 70,
+                maxZoom: 19,
+                duration: 1800
+            });
+        } else {
+            throw new Error('GeoJSON koordinatları bulunamadı.');
+        }
+
+        // Sürekli genişleyip daralan halo animasyonu
+        let baslangicZamani = null;
+
+        function haloAnimasyonunuCalistir(zaman) {
+            if (!map.getLayer(haloId)) {
+                window.parselHaloAnimasyonu = null;
+                return;
+            }
+
+            if (baslangicZamani === null) {
+                baslangicZamani = zaman;
+            }
+
+            const oran =
+                ((zaman - baslangicZamani) % 1600) / 1600;
+
+            const parlaklik =
+                (1 - Math.cos(oran * Math.PI * 2)) / 2;
+
+            map.setPaintProperty(
+                haloId,
+                'line-width',
+                7 + parlaklik * 7
+            );
+
+            map.setPaintProperty(
+                haloId,
+                'line-opacity',
+                0.4 + parlaklik * 0.55
+            );
+
+            window.parselHaloAnimasyonu =
+                requestAnimationFrame(haloAnimasyonunuCalistir);
+        }
+
+        window.parselHaloAnimasyonu =
+            requestAnimationFrame(haloAnimasyonunuCalistir);
+
+        console.log('Yüklenen GeoJSON:', veri);
+        bildirimGoster('GeoJSON haritaya eklendi: ' + dosya.name, 'olumlu');
+
+    } catch (hata) {
+        console.error('GeoJSON yükleme hatası:', hata);
+        bildirimGoster('GeoJSON yüklenemedi: ' + hata.message, 'olumsuz');
+    }
+
+    this.value = '';
+});
+
+
+(function () {
+    const modalKart = document.querySelector(
+        '#ucus-modal .ucus-modal-kart'
+    );
+    const baslik = modalKart?.querySelector('h2');
+
+    if (!modalKart || !baslik) return;
+
+    let surukleniyor = false;
+    let baslangicX = 0;
+    let baslangicY = 0;
+    let kartX = 0;
+    let kartY = 0;
+
+    baslik.addEventListener('mousedown', function (e) {
+        if (e.button !== 0) return;
+
+        const rect = modalKart.getBoundingClientRect();
+
+        surukleniyor = true;
+        baslangicX = e.clientX;
+        baslangicY = e.clientY;
+        kartX = rect.left;
+        kartY = rect.top;
+
+        modalKart.style.position = 'fixed';
+        modalKart.style.left = kartX + 'px';
+        modalKart.style.top = kartY + 'px';
+        modalKart.style.margin = '0';
+
+        e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', function (e) {
+        if (!surukleniyor) return;
+
+        const yeniX = kartX + e.clientX - baslangicX;
+        const yeniY = kartY + e.clientY - baslangicY;
+
+        modalKart.style.left = Math.max(
+            0, Math.min(yeniX, window.innerWidth - modalKart.offsetWidth)
+        ) + 'px';
+
+        modalKart.style.top = Math.max(
+            0, Math.min(yeniY, window.innerHeight - modalKart.offsetHeight)
+        ) + 'px';
+    });
+
+    document.addEventListener('mouseup', function () {
+        surukleniyor = false;
+    });
+})();
+
+
+// =====================================================
+// TANITIM BİLGİLERİ MODALI
+// =====================================================
+
+const BILGI_KAYIT_ANAHTARI = 'ennetmax_tanitim_bilgileri_v1';
+
+const varsayilanBilgiler = [
+    {
+        text: 'Laleli Mahallesinde',
+        color: '#ffffff',
+        size: '20',
+        weight: '700',
+        isBadge: false
+    },
+    {
+        text: 'Konut Alanı İmarlı',
+        color: '#38bdf8',
+        size: '16',
+        weight: '500',
+        isBadge: false
+    },
+    {
+        text: 'A-3 | Emsal: 0.75',
+        color: '#cbd5e1',
+        size: '15',
+        weight: '500',
+        isBadge: false
+    },
+    {
+        text: 'Başlangıç Fiyatı: 90.000 €',
+        color: '#facc15',
+        size: '16',
+        weight: '600',
+        isBadge: false
+    },
+    {
+        text: 'SATILIK PARSEL',
+        color: '#0284c7',
+        size: '14',
+        weight: '800',
+        isBadge: true
+    }
+];
+
+let tanitimBilgileri = (() => {
+    try {
+        const kayit = localStorage.getItem(BILGI_KAYIT_ANAHTARI);
+        return kayit ? JSON.parse(kayit) : [...varsayilanBilgiler];
+    } catch {
+        return [...varsayilanBilgiler];
+    }
+})();
+
+const bilgilerModal = document.getElementById('bilgiler-modal');
+const bilgiSatirlari = document.getElementById('bilgi-satirlari');
+
+document.getElementById('bilgiler-duzenle-btn')
+    .addEventListener('click', function () {
+        bilgiSatirlariniGoster();
+        bilgilerModal.style.display = 'flex';
+    });
+
+function bilgiSatirlariniGoster() {
+    bilgiSatirlari.innerHTML = '';
+
+    tanitimBilgileri.forEach((bilgi, index) => {
+        const satir = document.createElement('div');
+        satir.className = 'bilgi-satir';
+		satir.draggable = true;
+		satir.style.cursor = 'grab';
+
+        satir.innerHTML = `
+            <input class="bilgi-metni"
+                   type="text"
+                   placeholder="Gösterilecek metin">
+
+            <input class="bilgi-rengi"
+                   type="color"
+                   title="Yazı rengi">
+
+            <select class="bilgi-boyutu" title="Yazı boyutu">
+                <option value="12">12 px</option>
+                <option value="14">14 px</option>
+                <option value="16">16 px</option>
+                <option value="18">18 px</option>
+                <option value="20">20 px</option>
+                <option value="24">24 px</option>
+                <option value="28">28 px</option>
+                <option value="32">32 px</option>
+            </select>
+
+            <select class="bilgi-kalinligi" title="Yazı kalınlığı">
+                <option value="400">Normal</option>
+                <option value="500">Orta</option>
+                <option value="600">Yarı kalın</option>
+                <option value="700">Kalın</option>
+                <option value="800">Çok kalın</option>
+            </select>
+
+            <button type="button" class="bilgi-sil">Sil</button>
+
+            <label>
+                <input type="checkbox" class="bilgi-rozet">
+                Rozet olarak göster
+            </label>
+        `;
+
+        satir.querySelector('.bilgi-metni').value = bilgi.text ?? '';
+        satir.querySelector('.bilgi-rengi').value = bilgi.color ?? '#ffffff';
+        satir.querySelector('.bilgi-boyutu').value = String(bilgi.size ?? '16');
+        satir.querySelector('.bilgi-kalinligi').value = String(bilgi.weight ?? '500');
+        satir.querySelector('.bilgi-rozet').checked = Boolean(bilgi.isBadge);
+
+        satir.querySelector('.bilgi-sil').addEventListener('click', () => {
+            satir.remove();
+        });
+		
+		satir.addEventListener('dragstart', function (e) {
+			satir.style.opacity = '0.5';
+			e.dataTransfer.setData(
+				'text/plain',
+				Array.from(bilgiSatirlari.children).indexOf(satir)
+			);
+			e.dataTransfer.effectAllowed = 'move';
+		});
+
+		satir.addEventListener('dragend', function () {
+			satir.style.opacity = '1';
+		});
+
+		satir.addEventListener('dragover', function (e) {
+			e.preventDefault();
+			e.dataTransfer.dropEffect = 'move';
+		});
+
+		satir.addEventListener('drop', function (e) {
+			e.preventDefault();
+
+			const kaynakIndex = Number(e.dataTransfer.getData('text/plain'));
+			const satirlar = Array.from(bilgiSatirlari.children);
+			const kaynakSatir = satirlar[kaynakIndex];
+
+			if (!kaynakSatir || kaynakSatir === satir) return;
+
+			const hedefRect = satir.getBoundingClientRect();
+			const altaBirak = e.clientY > hedefRect.top + hedefRect.height / 2;
+
+			if (altaBirak) {
+				satir.after(kaynakSatir);
+			} else {
+				satir.before(kaynakSatir);
+			}
+		});
+
+        bilgiSatirlari.appendChild(satir);
+    });
+}
+
+document.getElementById('bilgi-satir-ekle')
+    .addEventListener('click', function () {
+        tanitimBilgileriniOku();
+        tanitimBilgileri.push({
+            text: '',
+            color: '#ffffff',
+            size: '16',
+            weight: '500',
+            isBadge: false
+        });
+        bilgiSatirlariniGoster();
+    });
+
+function tanitimBilgileriniOku() {
+    tanitimBilgileri = Array.from(
+        bilgiSatirlari.querySelectorAll('.bilgi-satir')
+    ).map(satir => ({
+        text: satir.querySelector('.bilgi-metni').value.trim(),
+        color: satir.querySelector('.bilgi-rengi').value,
+        size: satir.querySelector('.bilgi-boyutu').value,
+        weight: satir.querySelector('.bilgi-kalinligi').value,
+        isBadge: satir.querySelector('.bilgi-rozet').checked
+    }));
+}
+
+document.getElementById('bilgi-tamam')
+    .addEventListener('click', function () {
+        tanitimBilgileriniOku();
+
+        try {
+            localStorage.setItem(
+                BILGI_KAYIT_ANAHTARI,
+                JSON.stringify(tanitimBilgileri)
+            );
+
+            bilgilerModal.style.display = 'none';
+        } catch (hata) {
+            bildirimGoster('Bilgiler kaydedilemedi.', 'olumsuz');
+        }
+    });  
+
+
+
+
+document.getElementById('bilgi-kapat').addEventListener('click', function () {
+    bilgilerModal.style.display = 'none';
+});
+
+
+document.getElementById('ucus-modal-kapat').addEventListener('click', function () {
+    document.getElementById('ucus-modal').style.display = 'none';
+});
+
+
+
+function bildirimGoster(mesaj, tur = 'bilgi', sure = 3000) {
+    let alan = document.getElementById('ust-bildirim-alani');
+
+    if (!alan) {
+        alan = document.createElement('div');
+        alan.id = 'ust-bildirim-alani';
+        document.body.appendChild(alan);
+    }
+
+    const simgeler = {
+        olumlu: '✓',
+        bilgi: '−',
+        uyari: '!',
+        olumsuz: '×'
+    };
+
+    const bildirim = document.createElement('div');
+    bildirim.className = `ust-bildirim ${tur}`;
+
+    const simge = document.createElement('span');
+    simge.className = 'bildirim-simge';
+    simge.textContent = simgeler[tur] || simgeler.bilgi;
+
+    const yazi = document.createElement('span');
+    yazi.textContent = mesaj;
+
+    bildirim.append(simge, yazi);
+    alan.appendChild(bildirim);
+
+    requestAnimationFrame(() => bildirim.classList.add('goster'));
+
+    setTimeout(() => {
+        bildirim.classList.remove('goster');
+        setTimeout(() => bildirim.remove(), 300);
+    }, sure);
+}
+
+
+
+document.getElementById('ucus-export-btn').addEventListener('click', function () {
+    try {
+        // Tanıtım penceresinde düzenleme varsa güncel satırları al.
+        const satirlar = document.querySelectorAll(
+            '#bilgi-satirlari .bilgi-satir'
+        );
+
+        if (satirlar.length > 0) {
+            tanitimBilgileriniOku();
+        }
+
+        // Ekrandaki güncel uçuş ayarlarını al.
+        const ucusAyarlari = {
+            baslangicZoom: document.getElementById('baslangic-zoom').value,
+            ucusZoom: document.getElementById('ucus-zoom').value,
+            kameraAcisi: document.getElementById('kamera-acisi').value,
+            kameraYonu: document.getElementById('kamera-yonu').value,
+            duraklar: Array.from(
+                document.querySelectorAll('#rota-listesi .rota-kart')
+            ).map(function (kart) {
+                return {
+                    ad: kart.querySelector('.durak-adi')?.value || '',
+                    koordinat: kart.querySelector('.durak-koordinat')?.value || '',
+                    sure: kart.querySelector('.durak-suresi')?.value || '',
+                    etiket: kart.querySelector('.durak-etiket')?.value || ''
+                };
+            })
+        };
+
+        const proje = {
+            format: 'ennetmax-ucus-projesi',
+            version: 1,
+            ucusAyarlari: ucusAyarlari,
+            tanitimBilgileri: tanitimBilgileri
+        };
+
+        const blob = new Blob(
+            [JSON.stringify(proje, null, 2)],
+            { type: 'application/json;charset=utf-8' }
+        );
+
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+
+        link.href = url;
+        link.download = 'Ennetmax_Ucus.json';
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+
+        setTimeout(function () {
+            URL.revokeObjectURL(url);
+        }, 1000);
+
+        bildirimGoster('Uçuş JSON dosyasına aktarıldı.', 'olumlu');
+
+    } catch (hata) {
+        console.error('Export hatası:', hata);
+        bildirimGoster('JSON dışa aktarma başarısız.', 'olumsuz');
+    }
+});
+
+
+
+document.getElementById('ucus-import-btn').addEventListener('click', function () {
+    document.getElementById('ucus-import-dosya').click();
+});
+
+document.getElementById('ucus-import-dosya').addEventListener('change', async function (event) {
+    const dosya = event.target.files[0];
+    if (!dosya) return;
+
+    try {
+        const veri = JSON.parse(await dosya.text());
+
+        if (
+            veri.format !== 'ennetmax-ucus-projesi' ||
+            veri.version !== 1 ||
+            !veri.ucusAyarlari ||
+            !Array.isArray(veri.ucusAyarlari.duraklar) ||
+            !Array.isArray(veri.tanitimBilgileri)
+        ) {
+            throw new Error('JSON dosya biçimi geçersiz.');
+        }
+
+        const ayarlar = veri.ucusAyarlari;
+
+        // Kamera ayarlarını doğrula.
+        for (const alan of [
+            'baslangicZoom', 'ucusZoom', 'kameraAcisi', 'kameraYonu'
+        ]) {
+            if (!Number.isFinite(Number(ayarlar[alan]))) {
+                throw new Error('Kamera ayarı geçersiz: ' + alan);
+            }
+        }
+
+        // Durakların koordinat ve alanlarını doğrula.
+        for (const durak of ayarlar.duraklar) {
+            if (
+                !durak ||
+                typeof durak.ad !== 'string' ||
+                typeof durak.koordinat !== 'string' ||
+                !Array.isArray(durak.koordinat.split(','))
+            ) {
+                throw new Error('Durak bilgisi geçersiz.');
+            }
+
+            const koordinat = durak.koordinat.split(',').map(Number);
+
+            if (
+                koordinat.length !== 2 ||
+                !koordinat.every(Number.isFinite) ||
+                koordinat[0] < -180 || koordinat[0] > 180 ||
+                koordinat[1] < -90 || koordinat[1] > 90
+            ) {
+                throw new Error('Geçersiz koordinat: ' + durak.koordinat);
+            }
+        }
+
+        // Tanıtım satırlarını doğrula.
+        for (const bilgi of veri.tanitimBilgileri) {
+            if (
+                !bilgi ||
+                typeof bilgi.text !== 'string' ||
+                typeof bilgi.color !== 'string' ||
+                !Number.isFinite(Number(bilgi.size)) ||
+                !Number.isFinite(Number(bilgi.weight)) ||
+                typeof bilgi.isBadge !== 'boolean'
+            ) {
+                throw new Error('Tanıtım bilgisi geçersiz.');
+            }
+        }
+
+        // Geçerli dosyayı mevcut kayıt anahtarlarına aktar.
+        localStorage.setItem(
+            UCUS_AYAR_KAYIT_ANAHTARI,
+            JSON.stringify(ayarlar)
+        );
+
+        localStorage.setItem(
+            BILGI_KAYIT_ANAHTARI,
+            JSON.stringify(veri.tanitimBilgileri)
+        );
+
+        // Mevcut yükleme fonksiyonu kamera ve durakları doldurur.
+        ucusAyarlariniYukle();
+
+        // Tanıtım bilgilerini bellekte güncelle.
+        tanitimBilgileri = veri.tanitimBilgileri;
+
+        // Tanıtım modalı açıksa satırları da yenile.
+        const bilgiModal = document.getElementById('bilgiler-modal');
+        if (bilgiModal && bilgiModal.style.display !== 'none') {
+            bilgiSatirlariniGoster();
+        }
+
+        bildirimGoster('Uçuş ve tanıtım bilgileri içe aktarıldı.', 'olumlu');
+
+    } catch (hata) {
+        console.error('Import hatası:', hata);
+        bildirimGoster(
+            'Dosya yüklenemedi. JSON biçimini kontrol et.',
+            'olumsuz'
+        );
+    } finally {
+        event.target.value = '';
+    }
+});
+
+
+
+</script>
+</body>
+</html> 
