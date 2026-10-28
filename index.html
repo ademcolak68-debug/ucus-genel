@@ -2826,7 +2826,7 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
     event.preventDefault();
 
     const repo = 'ademcolak68-debug/ucus-genel';
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/`;
+	const apiUrl = `https://api.github.com/repos/${repo}/contents/veriler`;
 
     let secimModal = null;
 
@@ -2869,6 +2869,7 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
         baslik.textContent = 'GitHub Uçuş Dosyası Seç';
 
         const liste = document.createElement('select');
+		liste.setAttribute('aria-label', 'Dosya adı seçin');
         liste.style.cssText = `
             width:100%;padding:10px;margin:10px 0 15px;
             box-sizing:border-box;
@@ -2882,7 +2883,7 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
         });
 
         const ekleBtn = document.createElement('button');
-        ekleBtn.textContent = 'Seçilen Dosyayı Ekle';
+        ekleBtn.textContent = 'Tamam';
 
         const iptalBtn = document.createElement('button');
         iptalBtn.textContent = 'İptal';
