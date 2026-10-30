@@ -1919,6 +1919,368 @@ const map = new mapboxgl.Map({
 });
 
 
+// =====================================
+// DİNAMİK YOL YAZILARI - ÇOKLU KAYIT
+// =====================================
+
+const YOL_YAZILARI_KAYIT_ANAHTARI = 'ennetmax_yol_yazilari_v1';
+let yolYazisiSayaci = 0;
+let yolYazisiSecimAktif = false;
+let yolYazisiIlkNokta = null;
+let secilenYolAdi = '';
+let secilenYolBoyutu = 13;
+window.yolYazilari = Array.isArray(window.yolYazilari) ? window.yolYazilari : [];
+
+function yolYazisiKayitlariniHazirla() {
+    return (Array.isArray(window.yolYazilari) ? window.yolYazilari : []).map(y => ({
+        id: y.id,
+        yolAdi: y.yolAdi,
+        boyut: y.boyut,
+        nokta1: [...y.nokta1],
+        nokta2: [...y.nokta2]
+    }));
+}
+
+function yolYazisiVerisiniDogrula(y) {
+    if (!y || typeof y.yolAdi !== 'string' || !y.yolAdi.trim()) return false;
+    const boyut = Number(y.boyut);
+    if (!Number.isFinite(boyut) || boyut < 6 || boyut > 50) return false;
+    for (const nokta of [y.nokta1, y.nokta2]) {
+        if (!Array.isArray(nokta) || nokta.length < 2 ||
+            !Number.isFinite(Number(nokta[0])) || !Number.isFinite(Number(nokta[1])) ||
+            Number(nokta[0]) < -180 || Number(nokta[0]) > 180 ||
+            Number(nokta[1]) < -90 || Number(nokta[1]) > 90) return false;
+    }
+    return true;
+}
+
+// Bütün yol adları tek GeoJSON kaynağı ve tek sembol katmanında tutulur.
+// Böylece kayıt sayısı arttığında katman/kaynak ID çakışması yaşanmaz.
+const YOL_YAZISI_TOPLU_KAYNAK_ID = 'yol-yazilari-toplu-source';
+const YOL_YAZISI_TOPLU_KATMAN_ID = 'yol-yazilari-toplu-text';
+
+function yolYazisiGeoJSONHazirla(kayitlar) {
+    return {
+        type: 'FeatureCollection',
+        features: kayitlar.map(y => ({
+            type: 'Feature',
+            properties: {
+                kayit_id: String(y.id),
+                yol_adi: y.yolAdi,
+                yol_boyutu: Number(y.boyut)
+            },
+            geometry: {
+                type: 'LineString',
+                coordinates: [
+                    [Number(y.nokta1[0]), Number(y.nokta1[1])],
+                    [Number(y.nokta2[0]), Number(y.nokta2[1])]
+                ]
+            }
+        }))
+    };
+}
+
+function yolYazisiKatmanlariniTemizle() {
+    if (!map.isStyleLoaded()) return false;
+
+    const stil = map.getStyle();
+    const katmanlar = (stil.layers || []).filter(layer =>
+        layer.id === YOL_YAZISI_TOPLU_KATMAN_ID ||
+        layer.id.startsWith('yol-yazisi-text-') ||
+        layer.id.startsWith('yol-yazisi-line-')
+    );
+    katmanlar.forEach(layer => {
+        if (map.getLayer(layer.id)) map.removeLayer(layer.id);
+    });
+
+    const kaynaklar = Object.keys(map.getStyle().sources || {}).filter(id =>
+        id === YOL_YAZISI_TOPLU_KAYNAK_ID ||
+        id.startsWith('yol-yazisi-source-') ||
+        id.startsWith('yol-yazisi-nokta-')
+    );
+    kaynaklar.forEach(id => {
+        if (map.getSource(id)) map.removeSource(id);
+    });
+
+    window.yolYazilari = [];
+    yolYazisiSayaci = 0;
+    return true;
+}
+
+function yolYazisiTopluKatmaniniHazirla() {
+    if (!map.isStyleLoaded()) return false;
+
+    if (!map.getSource(YOL_YAZISI_TOPLU_KAYNAK_ID)) {
+        map.addSource(YOL_YAZISI_TOPLU_KAYNAK_ID, {
+            type: 'geojson',
+            data: { type: 'FeatureCollection', features: [] }
+        });
+    }
+
+    if (!map.getLayer(YOL_YAZISI_TOPLU_KATMAN_ID)) {
+        map.addLayer({
+            id: YOL_YAZISI_TOPLU_KATMAN_ID,
+            type: 'symbol',
+            source: YOL_YAZISI_TOPLU_KAYNAK_ID,
+            layout: {
+                'text-field': ['get', 'yol_adi'],
+                'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
+                'text-size': ['get', 'yol_boyutu'],
+                'text-letter-spacing': 0.15,
+                'symbol-placement': 'line-center',
+                'text-pitch-alignment': 'viewport',
+                'text-rotation-alignment': 'map',
+                'text-keep-upright': true,
+                'text-allow-overlap': true,
+                'text-ignore-placement': true,
+                'text-max-angle': 90
+            },
+            paint: {
+                'text-color': '#ffffff',
+                'text-halo-color': '#0f172a',
+                'text-halo-width': 2.5
+            }
+        });
+        map.setLayerZoomRange(YOL_YAZISI_TOPLU_KATMAN_ID, 0, 24);
+    }
+    return true;
+}
+
+function yolYazisiHaritaVerisiniGuncelle() {
+    if (!yolYazisiTopluKatmaniniHazirla()) return false;
+    const kaynak = map.getSource(YOL_YAZISI_TOPLU_KAYNAK_ID);
+    if (!kaynak) return false;
+    kaynak.setData(yolYazisiGeoJSONHazirla(window.yolYazilari));
+    return true;
+}
+
+function yolYazisiniKatmanaDonustur(yolAdi, boyut, nokta1, nokta2, kayitId) {
+    if (!map.isStyleLoaded()) return null;
+
+    const id = Number.isInteger(Number(kayitId)) && Number(kayitId) > 0
+        ? Number(kayitId) : yolYazisiSayaci + 1;
+    const kayit = {
+        id,
+        yolAdi: String(yolAdi).trim(),
+        boyut: Number(boyut),
+        nokta1: [Number(nokta1[0]), Number(nokta1[1])],
+        nokta2: [Number(nokta2[0]), Number(nokta2[1])]
+    };
+
+    if (!yolYazisiVerisiniDogrula(kayit)) {
+        throw new Error('Yol yazısı verisi geçersiz: ' + id);
+    }
+
+    const mevcutIndex = window.yolYazilari.findIndex(y => String(y.id) === String(id));
+    const oncekiKayit = mevcutIndex >= 0 ? window.yolYazilari[mevcutIndex] : null;
+    if (mevcutIndex >= 0) window.yolYazilari[mevcutIndex] = kayit;
+    else window.yolYazilari.push(kayit);
+
+    yolYazisiSayaci = Math.max(yolYazisiSayaci, id);
+    if (!yolYazisiHaritaVerisiniGuncelle()) {
+        if (mevcutIndex >= 0) window.yolYazilari[mevcutIndex] = oncekiKayit;
+        else window.yolYazilari = window.yolYazilari.filter(y => String(y.id) !== String(id));
+        throw new Error('Yol yazısı harita katmanına aktarılamadı.');
+    }
+    return kayit;
+}
+
+function yolYazilariniYukle(kayitlar, { temizle = false } = {}) {
+    if (!Array.isArray(kayitlar)) {
+        console.error('Yol yazıları listesi dizi değil.');
+        return { toplam: 0, yuklenen: 0, hatali: 0 };
+    }
+
+    let tamamlandi = false;
+    const haritaHazirsaUygula = () => {
+        if (tamamlandi || !map.isStyleLoaded()) return;
+        tamamlandi = true;
+        map.off('load', haritaHazirsaUygula);
+        map.off('style.load', haritaHazirsaUygula);
+        map.off('idle', haritaHazirsaUygula);
+
+        if (temizle) yolYazisiKatmanlariniTemizle();
+
+        // Önce mevcut kayıtları koru; her gelen kayıt bağımsız doğrulanır.
+        const oncekiKayitlar = temizle ? [] : [...window.yolYazilari];
+        const kabulEdilenler = [...oncekiKayitlar];
+        const hatalar = [];
+
+        kayitlar.forEach((y, sira) => {
+            if (!yolYazisiVerisiniDogrula(y)) {
+                hatalar.push({ sira: sira + 1, id: y?.id ?? null, neden: 'Veri doğrulaması başarısız' });
+                return;
+            }
+
+            const id = Number.isInteger(Number(y.id)) && Number(y.id) > 0
+                ? Number(y.id) : (yolYazisiSayaci + 1);
+            const kayit = {
+                id,
+                yolAdi: y.yolAdi.trim(),
+                boyut: Number(y.boyut),
+                nokta1: y.nokta1.map(Number),
+                nokta2: y.nokta2.map(Number)
+            };
+
+            const ayniId = kabulEdilenler.findIndex(eski => String(eski.id) === String(id));
+            if (ayniId >= 0) kabulEdilenler[ayniId] = kayit;
+            else kabulEdilenler.push(kayit);
+            yolYazisiSayaci = Math.max(yolYazisiSayaci, id);
+        });
+
+        window.yolYazilari = kabulEdilenler;
+        try {
+            if (!yolYazisiHaritaVerisiniGuncelle()) {
+                throw new Error('Toplu yol yazısı katmanı oluşturulamadı.');
+            }
+        } catch (hata) {
+            console.error('Toplu yol yazısı çizim hatası:', hata);
+            // Katman oluşturma hatasında veriler bellekte korunur; çizim hatası gizlenmez.
+            bildirimGoster('Yol yazıları verisi alındı ancak haritaya çizilemedi: ' + hata.message, 'olumsuz');
+            return;
+        }
+
+        if (hatalar.length) {
+            console.warn('Yüklenemeyen yol yazıları:', hatalar);
+            bildirimGoster(
+                `${kayitlar.length} yol kaydından ${kayitlar.length - hatalar.length} tanesi yüklendi, ${hatalar.length} tanesi hatalı. Ayrıntılar konsolda.`,
+                'uyari'
+            );
+        }
+    };
+
+    map.on('load', haritaHazirsaUygula);
+    map.on('style.load', haritaHazirsaUygula);
+    map.on('idle', haritaHazirsaUygula);
+    haritaHazirsaUygula();
+}
+
+
+// Ekle: her işlem iki yeni harita noktası seçerek ayrı bir yazı oluşturur.
+document.getElementById('yol-yazisi-ekle-onay-btn').addEventListener('click', function () {
+    const yolAdi = document.getElementById('yol-yazisi-metni').value.trim();
+    const boyut = Number(document.getElementById('yol-yazisi-size').value);
+    if (!yolAdi) { bildirimGoster('Lütfen yol adını girin.', 'uyari'); return; }
+    if (!Number.isFinite(boyut) || boyut < 6 || boyut > 50) {
+        bildirimGoster('Yazı boyutu 6 ile 50 arasında olmalıdır.', 'uyari'); return;
+    }
+    if (koordinatSecilecekInput) {
+        bildirimGoster('Önce devam eden rota koordinat seçimini tamamlayın.', 'uyari'); return;
+    }
+    secilenYolAdi = yolAdi;
+    secilenYolBoyutu = boyut;
+    yolYazisiIlkNokta = null;
+    yolYazisiSecimAktif = true;
+    map.getCanvas().style.cursor = 'crosshair';
+    this.textContent = '1. Noktayı Seç';
+    bildirimGoster('Haritadan yolun başlangıç noktasını seçin.', 'bilgi');
+});
+
+// Yeni yazı düğmesi
+document.getElementById('yol-yazisi-yeni-btn')
+    .addEventListener('click', function () {
+
+        yolYazisiSecimAktif = false;
+        yolYazisiIlkNokta = null;
+        map.getCanvas().style.cursor = '';
+
+        document.getElementById('yol-yazisi-metni').value = '';
+        document.getElementById('yol-yazisi-size').value = 13;
+
+        document.getElementById('yol-yazisi-ekle-onay-btn')
+            .textContent = 'Ekle';
+
+        document.getElementById('yol-yazisi-metni').focus();
+
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+let koordinatSecilecekInput = null;
+
+document.addEventListener('click', function (e) {
+    const buton = e.target.closest('.haritadan-koordinat-sec');
+    if (!buton) return;
+
+    koordinatSecilecekInput =
+        buton.closest('.rota-kart').querySelector('.durak-koordinat');
+
+    document.querySelectorAll('.haritadan-koordinat-sec')
+        .forEach(b => b.classList.remove('aktif'));
+
+    buton.classList.add('aktif');
+	map.getCanvas().style.cursor = 'crosshair';
+	
+});
+
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (yolYazisiSecimAktif) {
+        yolYazisiSecimAktif = false;
+        yolYazisiIlkNokta = null;
+        map.getCanvas().style.cursor = '';
+        document.getElementById('yol-yazisi-ekle-onay-btn').textContent = 'Ekle';
+        bildirimGoster('Yol yazısı nokta seçimi iptal edildi.', 'uyari');
+        e.preventDefault();
+        return;
+    }
+    if (!koordinatSecilecekInput) return;
+    koordinatSecilecekInput = null;
+    document.querySelectorAll('.haritadan-koordinat-sec').forEach(b => b.classList.remove('aktif'));
+    map.getCanvas().style.cursor = '';
+    e.preventDefault();
+});
+
+
+
+map.on('click', function (e) {
+    // Yol yazısı seçimi, rota koordinat seçiminden önceliklidir.
+    if (yolYazisiSecimAktif) {
+        const nokta = [e.lngLat.lng, e.lngLat.lat];
+        if (!yolYazisiIlkNokta) {
+            yolYazisiIlkNokta = nokta;
+            document.getElementById('yol-yazisi-ekle-onay-btn').textContent = '2. Noktayı Seç';
+            bildirimGoster('Başlangıç noktası seçildi. Bitiş noktasını seçin.', 'bilgi');
+            return;
+        }
+        if (yolYazisiIlkNokta[0] === nokta[0] && yolYazisiIlkNokta[1] === nokta[1]) {
+            bildirimGoster('Başlangıç noktasından farklı bir nokta seçin.', 'uyari');
+            return;
+        }
+        yolYazisiniKatmanaDonustur(secilenYolAdi, secilenYolBoyutu, yolYazisiIlkNokta, nokta);
+        yolYazisiSecimAktif = false;
+        yolYazisiIlkNokta = null;
+        map.getCanvas().style.cursor = '';
+        document.getElementById('yol-yazisi-ekle-onay-btn').textContent = 'Ekle';
+        bildirimGoster('Yol yazısı haritaya eklendi. Uçuş Kaydet ile projeye kaydedebilirsiniz.', 'olumlu');
+        return;
+    }
+
+    // Mevcut rota koordinat seçimi - davranışı korunmuştur.
+    if (!koordinatSecilecekInput) return;
+    koordinatSecilecekInput.value = `${e.lngLat.lng.toFixed(6)}, ${e.lngLat.lat.toFixed(6)}`;
+    koordinatSecilecekInput.dispatchEvent(new Event('input', { bubbles: true }));
+    koordinatSecilecekInput.dispatchEvent(new Event('change', { bubbles: true }));
+    if (!window.ucusSecilenNoktaIsaretcileri) window.ucusSecilenNoktaIsaretcileri = [];
+    const yeniIsaretci = new mapboxgl.Marker().setLngLat(e.lngLat).addTo(map);
+    window.ucusSecilenNoktaIsaretcileri.push(yeniIsaretci);
+    koordinatSecilecekInput = null;
+    document.querySelectorAll('.haritadan-koordinat-sec').forEach(b => b.classList.remove('aktif'));
+    map.getCanvas().style.cursor = '';
+});
+
+
 
 let koordinatSecilecekInput = null;
 
@@ -3639,7 +4001,11 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                 );
 
                 // Mevcut yükleme fonksiyonları.
-                ucusAyarlariniYukle();
+                // Mevcut yükleme fonksiyonları.
+				ucusAyarlariniYukle();
+				
+				// GitHub'dan gelen yol yazılarını haritaya yükle.
+				yolYazilariniYukle(gecerliYolYazilari, { temizle: true });
 
                 tanitimBilgileri = veri.tanitimBilgileri;
 
