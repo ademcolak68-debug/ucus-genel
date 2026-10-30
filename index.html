@@ -2241,6 +2241,7 @@ let yolYazisiSecimAktif = false;
 let yolYazisiIlkNokta = null;
 let secilenYolAdi = '';
 let secilenYolBoyutu = 13;
+let yolYazisiSilmeAktif = false;
 window.yolYazilari = Array.isArray(window.yolYazilari) ? window.yolYazilari : [];
 
 function yolYazisiKayitlariniHazirla() {
@@ -2552,38 +2553,112 @@ document.addEventListener('keydown', function (e) {
 
 
 map.on('click', function (e) {
-    // Yol yazısı seçimi, rota koordinat seçiminden önceliklidir.
+
+    // Yol yazısı silme
+    if (yolYazisiSilmeAktif) {
+        const bulunanlar = map.queryRenderedFeatures(e.point, {
+            layers: ['yol-yazilari-toplu-text']
+        });
+
+        if (!bulunanlar.length) {
+            bildirimGoster('Silmek için bir yol yazısının üzerine tıklayın.', 'uyari');
+            return;
+        }
+
+        const kayitId = bulunanlar[0].properties?.kayit_id;
+
+        if (!kayitId) return;
+
+        const silinecekIndex = window.yolYazilari.findIndex(
+            yol => String(yol.id) === String(kayitId)
+        );
+
+        if (silinecekIndex === -1) {
+            bildirimGoster('Yol yazısı kaydı bulunamadı.', 'uyari');
+            return;
+        }
+
+        window.yolYazilari.splice(silinecekIndex, 1);
+
+		localStorage.setItem(
+		    YOL_YAZILARI_KAYIT_ANAHTARI,
+		    JSON.stringify(yolYazisiKayitlariniHazirla())
+		);
+
+        yolYazisiHaritaVerisiniGuncelle();
+
+        yolYazisiSilmeAktif = false;
+        map.getCanvas().style.cursor = '';
+
+        bildirimGoster('Seçilen yol yazısı silindi.', 'olumlu');
+        return;
+    }
+
+    // Yol yazısı çizimi
     if (yolYazisiSecimAktif) {
         const nokta = [e.lngLat.lng, e.lngLat.lat];
+
         if (!yolYazisiIlkNokta) {
             yolYazisiIlkNokta = nokta;
             document.getElementById('yol-yazisi-ekle-onay-btn').textContent = '2. Noktayı Seç';
             bildirimGoster('Başlangıç noktası seçildi. Bitiş noktasını seçin.', 'bilgi');
             return;
         }
-        if (yolYazisiIlkNokta[0] === nokta[0] && yolYazisiIlkNokta[1] === nokta[1]) {
+
+        if (
+            yolYazisiIlkNokta[0] === nokta[0] &&
+            yolYazisiIlkNokta[1] === nokta[1]
+        ) {
             bildirimGoster('Başlangıç noktasından farklı bir nokta seçin.', 'uyari');
             return;
         }
-        yolYazisiniKatmanaDonustur(secilenYolAdi, secilenYolBoyutu, yolYazisiIlkNokta, nokta);
+
+        yolYazisiniKatmanaDonustur(
+            secilenYolAdi,
+            secilenYolBoyutu,
+            yolYazisiIlkNokta,
+            nokta
+        );
+
         yolYazisiSecimAktif = false;
         yolYazisiIlkNokta = null;
         map.getCanvas().style.cursor = '';
+
         document.getElementById('yol-yazisi-ekle-onay-btn').textContent = 'Ekle';
+
         bildirimGoster('Yol yazısı haritaya eklendi. Uçuş Kaydet ile projeye kaydedebilirsiniz.', 'olumlu');
         return;
     }
 
-    // Mevcut rota koordinat seçimi - davranışı korunmuştur.
+    // Mevcut rota koordinat seçimi
     if (!koordinatSecilecekInput) return;
-    koordinatSecilecekInput.value = `${e.lngLat.lng.toFixed(6)}, ${e.lngLat.lat.toFixed(6)}`;
-    koordinatSecilecekInput.dispatchEvent(new Event('input', { bubbles: true }));
-    koordinatSecilecekInput.dispatchEvent(new Event('change', { bubbles: true }));
-    if (!window.ucusSecilenNoktaIsaretcileri) window.ucusSecilenNoktaIsaretcileri = [];
-    const yeniIsaretci = new mapboxgl.Marker().setLngLat(e.lngLat).addTo(map);
+
+    koordinatSecilecekInput.value =
+        `${e.lngLat.lng.toFixed(6)}, ${e.lngLat.lat.toFixed(6)}`;
+
+    koordinatSecilecekInput.dispatchEvent(
+        new Event('input', { bubbles: true })
+    );
+
+    koordinatSecilecekInput.dispatchEvent(
+        new Event('change', { bubbles: true })
+    );
+
+    if (!window.ucusSecilenNoktaIsaretcileri) {
+        window.ucusSecilenNoktaIsaretcileri = [];
+    }
+
+    const yeniIsaretci = new mapboxgl.Marker()
+        .setLngLat(e.lngLat)
+        .addTo(map);
+
     window.ucusSecilenNoktaIsaretcileri.push(yeniIsaretci);
+
     koordinatSecilecekInput = null;
-    document.querySelectorAll('.haritadan-koordinat-sec').forEach(b => b.classList.remove('aktif'));
+
+    document.querySelectorAll('.haritadan-koordinat-sec')
+        .forEach(b => b.classList.remove('aktif'));
+
     map.getCanvas().style.cursor = '';
 });
 
@@ -3334,6 +3409,25 @@ yolYazisiKapatBtn.addEventListener('click', yolYazisiModalKapat);
 yolYazisiIptalBtn.addEventListener('click', yolYazisiModalKapat);
 
 
+// Yol yazısı silgi modu
+const yolYazisiSilBtn = document.getElementById('yol-yazisi-sil-btn');
+
+yolYazisiSilBtn.addEventListener('click', function () {
+    yolYazisiSilmeAktif = !yolYazisiSilmeAktif;
+
+    if (yolYazisiSilmeAktif) {
+        yolYazisiSecimAktif = false;
+        yolYazisiIlkNokta = null;
+
+        map.getCanvas().style.cursor =
+            'url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2716%27 height=%2716%27%3E%3Crect x=%272%27 y=%272%27 width=%2712%27 height=%2712%27 fill=%27white%27 stroke=%27red%27 stroke-width=%272%27/%3E%3C/svg%3E") 8 8, crosshair';
+
+        bildirimGoster('Silmek istediğiniz yol yazısına tıklayın.', 'bilgi');
+    } else {
+        map.getCanvas().style.cursor = '';
+    }
+});
+	
 
 (function () {
     const modalKart = document.querySelector(
