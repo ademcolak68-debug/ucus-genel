@@ -1847,6 +1847,8 @@ function ucusAyarlariniYukle() {
 
         rotaListesi.innerHTML = '';
 
+		yolYazisiKatmanlariniTemizle();
+
         if (Array.isArray(ayarlar.duraklar) && ayarlar.duraklar.length) {
             ayarlar.duraklar.forEach(durak => {
                 durakEkle();
