@@ -1892,6 +1892,9 @@ function ucusBilgileriniSil() {
     // Tarayıcı hafızasındaki kayıtlı ayarları sil
     localStorage.removeItem('ennetmax_ucus_ayarlari_v1');
 
+	 // Haritadaki yol yazılarını temizle
+    yolYazisiKatmanlariniTemizle();
+
     // Rota listesini temizle
     const rotaListesi = document.getElementById('rota-listesi');
     rotaListesi.innerHTML = '';
