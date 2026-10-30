@@ -768,7 +768,6 @@ body {
    17. UÇUŞ PROJESİ DIŞA AKTARMA VE İÇE AKTARMA
    ========================================================= */
 
-/* Export ve Import butonlarının ortak stili */
 #ucus-export-btn,
 #ucus-import-btn {
     flex: 1;
@@ -784,24 +783,17 @@ body {
     white-space: nowrap;
 }
 
-/* Dışa aktarma butonu */
-#ucus-export-btn {
-    background: #2563eb;
-}
-
-/* İçe aktarma butonu */
+/* Export ve Import ortak zemin rengi */
+#ucus-export-btn,
 #ucus-import-btn {
-    background: #475569;
+    background: #0e7490;
+    transition: background 0.2s ease;
 }
 
-/* Dışa aktarma hover rengi */
-#ucus-export-btn:hover {
-    background: #1d4ed8;
-}
-
-/* İçe aktarma hover rengi */
+/* İki butonun ortak hover rengi */
+#ucus-export-btn:hover,
 #ucus-import-btn:hover {
-    background: #334155;
+    background: #0891b2;
 }
 
 
