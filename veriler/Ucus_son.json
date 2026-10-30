@@ -1,0 +1,127 @@
+{
+  "format": "ennetmax-ucus-projesi",
+  "version": 1,
+  "ucusAyarlari": {
+    "baslangicZoom": "15",
+    "ucusZoom": "15",
+    "kameraAcisi": "22",
+    "kameraYonu": "0",
+    "duraklar": [
+      {
+        "ad": "1",
+        "koordinat": "34.038831, 38.352797",
+        "sure": "4.5",
+        "etiket": ""
+      },
+      {
+        "ad": "2",
+        "koordinat": "34.040065, 38.346579",
+        "sure": "4.5",
+        "etiket": "TOKİ"
+      },
+      {
+        "ad": "3",
+        "koordinat": "34.045494, 38.340545",
+        "sure": "10",
+        "etiket": ""
+      },
+      {
+        "ad": "4",
+        "koordinat": "34.052730, 38.319345",
+        "sure": "6",
+        "etiket": "SANIRTOL\\nCAMİ"
+      },
+      {
+        "ad": "5",
+        "koordinat": "34.057398, 38.317653",
+        "sure": "",
+        "etiket": ""
+      }
+    ],
+    "yolYazilari": [
+      {
+        "id": 1,
+        "yolAdi": "ALPARSLAN TÜRKEŞ BULVARI",
+        "boyut": 13,
+        "nokta1": [
+          34.03367843470639,
+          38.35426398724405
+        ],
+        "nokta2": [
+          34.03868089428593,
+          38.35584729857578
+        ]
+      },
+      {
+        "id": 2,
+        "yolAdi": "SAĞLIK KASABASI YOLU",
+        "boyut": 13,
+        "nokta1": [
+          34.03915301396475,
+          38.35561098564929
+        ],
+        "nokta2": [
+          34.042397581121634,
+          38.352704273574034
+        ]
+      },
+      {
+        "id": 3,
+        "yolAdi": "SAĞLIK KASABASI YOLU",
+        "boyut": 13,
+        "nokta1": [
+          34.04280255118391,
+          38.35202726958602
+        ],
+        "nokta2": [
+          34.04418227351945,
+          38.34778768628547
+        ]
+      }
+    ]
+  },
+  "tanitimBilgileri": [
+    {
+      "text": "Laleli Mahallesinde",
+      "color": "#ffffff",
+      "size": "20",
+      "weight": "700",
+      "isBadge": false
+    },
+    {
+      "text": "Konut Alanı İmarlı",
+      "color": "#38bdf8",
+      "size": "18",
+      "weight": "500",
+      "isBadge": false
+    },
+    {
+      "text": "A-3 | Emsal: 0.75",
+      "color": "#cbd5e1",
+      "size": "18",
+      "weight": "500",
+      "isBadge": false
+    },
+    {
+      "text": "Başlangıç Fiyatı: 90.000 €",
+      "color": "#facc15",
+      "size": "18",
+      "weight": "600",
+      "isBadge": false
+    },
+    {
+      "text": "856,25 m2",
+      "color": "#ff0000",
+      "size": "18",
+      "weight": "600",
+      "isBadge": false
+    },
+    {
+      "text": "SATILIK PARSEL",
+      "color": "#0284c7",
+      "size": "20",
+      "weight": "800",
+      "isBadge": true
+    }
+  ]
+}
