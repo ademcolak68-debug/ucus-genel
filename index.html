@@ -2207,6 +2207,8 @@ function yolYazisiVerisiniDogrula(y) {
             Number(nokta[1]) < -90 ||
             Number(nokta[1]) > 90
         ) return false;
+
+		window.yolYazisiVerisiniDogrula = yolYazisiVerisiniDogrula;
     }
 
     return true;
@@ -3561,23 +3563,20 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
 				    ? ayarlar.yolYazilari
 				    : (Array.isArray(veri.yolYazilari) ? veri.yolYazilari : []);
 				
-				// Bütün yol yazılarını tek tek doğrula.
+				// Yol yazılarını doğrula; geçersiz olanları sessizce atla.
 				const gecerliYolYazilari = [];
-				const hataliYolYazilari = [];
 				
-				gelenYolYazilari.forEach((yol, sira) => {
-				    if (yolYazisiVerisiniDogrula(yol)) {
+				gelenYolYazilari.forEach(yol => {
+				    if (window.yolYazisiVerisiniDogrula(yol)) {
 				        gecerliYolYazilari.push(yol);
-				    } else {
-				        hataliYolYazilari.push({
-				            sira: sira + 1,
-				            id: yol?.id ?? null
-				        });
 				    }
 				});
 				
-				// Doğrulanmış yol yazılarını uçuş ayarlarına yerleştir.
+				// Geçerli yol yazılarını uçuş ayarlarına yerleştir.
 				ayarlar.yolYazilari = gecerliYolYazilari;
+				
+				const atlananYolSayisi =
+				    gelenYolYazilari.length - gecerliYolYazilari.length;
 
                 for (const alan of [
                     'baslangicZoom',
@@ -3653,9 +3652,9 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                 modalKapat();
 
                 bildirimGoster(
-                    'GitHub uçuş ve tanıtım bilgileri içe aktarıldı.',
-                    'olumlu'
-                );
+				    `GitHub uçuş ve tanıtım bilgileri içe aktarıldı. ${gecerliYolYazilari.length} yol yazısı yüklendi${atlananYolSayisi > 0 ? `, ${atlananYolSayisi} geçersiz yol yazısı atlandı` : ''}.`,
+				    'olumlu'
+				);
 
             } catch (hata) {
                 console.error('Import hatası:', hata);
