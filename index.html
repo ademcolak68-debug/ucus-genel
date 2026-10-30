@@ -292,7 +292,6 @@ body {
    7. UÇUŞ AYARLARI VE PROJE YÖNETİMİ BUTONLARI
    ========================================================= */
 
-/* Uçuş ayar butonlarını yan yana dizer */
 .ucus-ayar-butonlari {
     display: flex;
     flex-direction: row;
@@ -301,7 +300,14 @@ body {
     margin-top: 8px;
 }
 
-/* Uçuş ayar butonlarının ortak görünümü */
+.ucus-ayar-butonlari {
+    display: flex;
+    flex-direction: row;
+    gap: 6px;
+    width: 100%;
+    margin-top: 8px;
+}
+
 .ucus-ayar-butonlari button {
     display: block;
     flex: 1;
@@ -310,38 +316,58 @@ body {
     padding: 8px 2px;
     border: none;
     border-radius: 5px;
-    background: #2563eb;
+    background: #64748b;
     color: #fff;
     font-size: 10px;
     font-weight: normal;
     line-height: 1.2;
     white-space: nowrap;
     cursor: pointer;
+    transition: background 0.2s ease;
 }
 
-/* Uçuş ayarlarını yükleme butonu */
-.ucus-ayar-butonlari #ucus-ayar-yukle-btn {
-    background: #475569;
+.ucus-ayar-butonlari button:hover,
+.ucus-ayar-butonlari #ucus-ayar-yukle-btn:hover,
+.ucus-ayar-butonlari #ucus-bilgileri-sil-btn:hover {
+    background: #000 !important;
 }
 
-/* Uçuş bilgilerini silme butonu */
-.ucus-ayar-butonlari #ucus-bilgileri-sil-btn {
-    background: #dc2626;
-}
 
-/* GeoJSON ekleme ve bilgi düzenleme butonları */
 #geojson-ekle-btn,
 #bilgiler-duzenle-btn {
+    display: block;
     flex: 1;
     min-width: 0;
-    padding: 7px;
+    min-height: 32px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 7px 3px;
     border: 0;
     border-radius: 4px;
     background: #374151;
-    color: white;
+    color: #fff;
     cursor: pointer;
     font-size: 10px;
     font-weight: normal;
+    transition: background 0.2s ease;
+}
+
+
+
+#geojson-ekle-btn:hover,
+#bilgiler-duzenle-btn:hover {
+    background: #000;
+}
+
+/* Bu üç butonu saran mevcut div */
+#ucus-modal .ucus-modal-kart > div:has(> #geojson-ekle-btn) {
+    display: flex;
+    align-items: stretch;
+    gap: 5px;
+    width: 100%;
+    box-sizing: border-box;
+    margin-top: 10px;
+    margin-bottom: 10px;
 }
 
 
