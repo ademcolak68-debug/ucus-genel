@@ -2018,66 +2018,6 @@ map.on('load', () => {
             'raster-fade-duration': 0
         }
     });
-	
-	
-
-    // Sağlık Kasabası yolu
-    map.addSource('saglik-yolu', {
-        type: 'geojson',
-        data: {
-            type: 'Feature',
-            properties: {
-                yol_adi: 'SAĞLIK KASABASI YOLU'
-            },
-            geometry: {
-                type: 'LineString',
-                coordinates: [
-                    [34.042683, 38.352317],
-                    [34.050096, 38.331288]
-                ]
-            }
-        }
-    });
-
-    // Yol çizgisi
-    map.addLayer({
-        id: 'saglik-yolu-line',
-        type: 'line',
-        source: 'saglik-yolu',
-        paint: {
-            'line-color': '#38bdf8',
-            'line-width': 3,
-            'line-opacity': 0.6,
-            'line-dasharray': [2, 2]
-        }
-    });
-
-    // Yol adı: çizgi boyunca ortada bir kez
-    map.addLayer({
-        id: 'saglik-yolu-text',
-        type: 'symbol',
-        source: 'saglik-yolu',
-        layout: {
-            'text-field': ['get', 'yol_adi'],
-            'text-font': ['Open Sans Bold', 'Arial Unicode MS Bold'],
-            'text-size': 13,
-            'text-letter-spacing': 0.15,
-            'symbol-placement': 'line-center',
-            'text-pitch-alignment': 'viewport',
-            'text-rotation-alignment': 'map',
-            'text-keep-upright': true,
-            'text-allow-overlap': true,
-            'text-ignore-placement': true
-        },
-        paint: {
-            'text-color': '#ffffff',
-            'text-halo-color': '#0f172a',
-            'text-halo-width': 2.5
-        }
-    });
-
-	
-
   
 });
 
@@ -2250,7 +2190,27 @@ function ucusEtiketleriniHaritayaEkle(rota) {
 }
 
 
+function yolYazisiVerisiniDogrula(y) {
+    if (!y || typeof y.yolAdi !== 'string' || !y.yolAdi.trim()) return false;
 
+    const boyut = Number(y.boyut);
+    if (!Number.isFinite(boyut) || boyut < 6 || boyut > 50) return false;
+
+    for (const nokta of [y.nokta1, y.nokta2]) {
+        if (
+            !Array.isArray(nokta) ||
+            nokta.length < 2 ||
+            !Number.isFinite(Number(nokta[0])) ||
+            !Number.isFinite(Number(nokta[1])) ||
+            Number(nokta[0]) < -180 ||
+            Number(nokta[0]) > 180 ||
+            Number(nokta[1]) < -90 ||
+            Number(nokta[1]) > 90
+        ) return false;
+    }
+
+    return true;
+}
 
 
 
