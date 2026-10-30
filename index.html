@@ -1149,6 +1149,66 @@ body {
 
 <audio id="ucusFonMuzigi" src="./muzik/ucus-muzik.mp3" preload="auto"></audio>
 
+<div id="yol-yazisi-modal" class="yol-yazisi-modal-arka" style="display:none;">
+    <div class="yol-yazisi-modal-kutu">
+
+        <div class="yol-yazisi-modal-baslik">
+            <span>Yol Yazısı Ekle</span>
+
+            <button
+                type="button"
+                id="yol-yazisi-kapat-btn"
+                class="yol-yazisi-modal-kapat"
+                title="Pencereyi kapat"
+                aria-label="Kapat"
+            >×</button>
+        </div>
+
+        <label for="yol-yazisi-metni">Yol adı</label>
+        <input
+            type="text"
+            id="yol-yazisi-metni"
+            placeholder="Örn. SAĞLIK KASABASI YOLU"
+            autocomplete="off"
+        >
+
+        <label for="yol-yazisi-size">Yazı boyutu</label>
+        <input
+            type="number"
+            id="yol-yazisi-size"
+            value="13"
+            min="6"
+            max="50"
+            step="1"
+        >
+
+        <div class="yol-yazisi-modal-butonlar">
+
+            <button
+                type="button"
+                id="yol-yazisi-sil-btn"
+                title="Seçilen yol yazısını sil"
+            >🧹 Silgi</button>
+
+            <button
+                type="button"
+                id="yol-yazisi-iptal-btn"
+            >İptal</button>
+
+            <button
+                type="button"
+                id="yol-yazisi-ekle-onay-btn"
+            >Ekle</button>
+
+            <button
+                type="button"
+                id="yol-yazisi-yeni-btn"
+            >＋ Yeni Yazı</button>
+
+        </div>
+    </div>
+</div>
+
 <script>
 mapboxgl.accessToken = 'pk.eyJ1IjoiZ2VvZ3JhcGh5cHJvZiIsImEiOiJjanYxb2t1ZG8wNGU1NGFsNXVkcnhzNmFpIn0.M3qCJK8FYa06B-Irc6FD-g';
 
