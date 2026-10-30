@@ -3595,6 +3595,30 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
 
                 const ayarlar = veri.ucusAyarlari;
 
+				// Yol yazılarını al: önce uçuş ayarlarının içinden,
+				// yoksa eski formatta ana JSON seviyesinden.
+				const gelenYolYazilari = Array.isArray(ayarlar.yolYazilari)
+				    ? ayarlar.yolYazilari
+				    : (Array.isArray(veri.yolYazilari) ? veri.yolYazilari : []);
+				
+				// Bütün yol yazılarını tek tek doğrula.
+				const gecerliYolYazilari = [];
+				const hataliYolYazilari = [];
+				
+				gelenYolYazilari.forEach((yol, sira) => {
+				    if (yolYazisiVerisiniDogrula(yol)) {
+				        gecerliYolYazilari.push(yol);
+				    } else {
+				        hataliYolYazilari.push({
+				            sira: sira + 1,
+				            id: yol?.id ?? null
+				        });
+				    }
+				});
+				
+				// Doğrulanmış yol yazılarını uçuş ayarlarına yerleştir.
+				ayarlar.yolYazilari = gecerliYolYazilari;
+
                 for (const alan of [
                     'baslangicZoom',
                     'ucusZoom',
