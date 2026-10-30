@@ -3062,658 +3062,155 @@ document.getElementById('ucus-export-btn').addEventListener('click', function ()
 
 
 
-document.getElementById('ucus-import-btn').addEventListener('click', async function (event) {
-    event.preventDefault();
+document.getElementById('ucus-import-btn').addEventListener('click', function () {
+    document.getElementById('ucus-import-dosya').click();
+});
 
-    const repo = 'ademcolak68-debug/ucus-genel';
-    const apiUrl = `https://api.github.com/repos/${repo}/contents/veriler`;
-
-    let secimModal = null;
+document.getElementById('ucus-import-dosya').addEventListener('change', async function (event) {
+    const dosya = event.target.files[0];
+    if (!dosya) return;
 
     try {
-        // GitHub veriler klasöründeki JSON dosyalarını bul.
-        const cevap = await fetch(apiUrl);
+        const veri = JSON.parse(await dosya.text());
 
-        if (!cevap.ok) {
-            throw new Error('GitHub klasörü okunamadı: ' + cevap.status);
+        if (
+            veri.format !== 'ennetmax-ucus-projesi' ||
+            veri.version !== 1 ||
+            !veri.ucusAyarlari ||
+            !Array.isArray(veri.ucusAyarlari.duraklar) ||
+            !Array.isArray(veri.tanitimBilgileri) ||
+            (veri.ucusAyarlari.yolYazilari !== undefined && !Array.isArray(veri.ucusAyarlari.yolYazilari)) ||
+            (veri.yolYazilari !== undefined && !Array.isArray(veri.yolYazilari))
+        ) {
+            throw new Error('JSON dosya biçimi geçersiz.');
         }
 
-        const dosyalar = await cevap.json();
+        const ayarlar = veri.ucusAyarlari;
 
-        const jsonDosyalari = dosyalar.filter(dosya =>
-            dosya.type === 'file' &&
-            dosya.name.toLowerCase().endsWith('.json')
+        // Örnek HTML'nin iç içe yapısı önceliklidir; eski üst seviye alan da desteklenir.
+        const gelenYolYazilari = Array.isArray(ayarlar.yolYazilari)
+            ? ayarlar.yolYazilari
+            : (Array.isArray(veri.yolYazilari) ? veri.yolYazilari : []);
+
+        // Yol yazılarının tamamını sayı sınırı olmadan tek tek kontrol et.
+        // Hatalı bir kayıt diğer geçerli kayıtların aktarılmasını engellemez.
+        const gecerliYolYazilari = [];
+        const hataliYolYazilari = [];
+        gelenYolYazilari.forEach((yol, sira) => {
+            if (yolYazisiVerisiniDogrula(yol)) {
+                gecerliYolYazilari.push(yol);
+            } else {
+                hataliYolYazilari.push({ sira: sira + 1, id: yol?.id ?? null });
+            }
+        });
+
+        // Kamera ayarlarını doğrula.
+        for (const alan of [
+            'baslangicZoom', 'ucusZoom', 'kameraAcisi', 'kameraYonu'
+        ]) {
+            if (!Number.isFinite(Number(ayarlar[alan]))) {
+                throw new Error('Kamera ayarı geçersiz: ' + alan);
+            }
+        }
+
+        // Tamamen boş taslak durakları atla; dolu durakların koordinatlarını doğrula.
+        const gecerliDuraklar = [];
+
+        for (const durak of ayarlar.duraklar) {
+            if (!durak || typeof durak !== 'object' || Array.isArray(durak)) {
+                throw new Error('Durak bilgisi geçersiz.');
+            }
+
+            const ad = String(durak.ad ?? '').trim();
+            const koordinatMetni = String(durak.koordinat ?? '').trim();
+            const sure = String(durak.sure ?? '').trim();
+            const etiket = String(durak.etiket ?? '').trim();
+
+            // Ad, koordinat, süre ve etiket tamamen boşsa bu yalnızca boş karttır.
+            if (!ad && !koordinatMetni && !sure && !etiket) {
+                continue;
+            }
+
+            if (typeof durak.ad !== 'string' || typeof durak.koordinat !== 'string') {
+                throw new Error('Durak adı veya koordinat alanı geçersiz.');
+            }
+
+            const koordinatParcalari = koordinatMetni.split(',').map(parca => parca.trim());
+            if (
+                koordinatParcalari.length !== 2 ||
+                !koordinatParcalari[0] ||
+                !koordinatParcalari[1]
+            ) {
+                throw new Error('Geçersiz koordinat: ' + durak.koordinat);
+            }
+
+            const koordinat = koordinatParcalari.map(Number);
+            if (
+                !koordinat.every(Number.isFinite) ||
+                koordinat[0] < -180 || koordinat[0] > 180 ||
+                koordinat[1] < -90 || koordinat[1] > 90
+            ) {
+                throw new Error('Geçersiz koordinat: ' + durak.koordinat);
+            }
+
+            gecerliDuraklar.push(durak);
+        }
+
+        // Boş taslak kartları kayda taşıma; hiç durak yoksa modal kendi boş kartını oluşturur.
+        ayarlar.duraklar = gecerliDuraklar;
+
+        // Tanıtım satırlarını doğrula.
+        for (const bilgi of veri.tanitimBilgileri) {
+            if (
+                !bilgi ||
+                typeof bilgi.text !== 'string' ||
+                typeof bilgi.color !== 'string' ||
+                !Number.isFinite(Number(bilgi.size)) ||
+                !Number.isFinite(Number(bilgi.weight)) ||
+                typeof bilgi.isBadge !== 'boolean'
+            ) {
+                throw new Error('Tanıtım bilgisi geçersiz.');
+            }
+        }
+
+        // Üç veri grubunu tek uçuş kaydında sakla.
+        const projeKaydi = {
+            ...ayarlar,
+            yolYazilari: gecerliYolYazilari,
+            tanitimBilgileri: veri.tanitimBilgileri
+        };
+
+        localStorage.setItem(
+            UCUS_AYAR_KAYIT_ANAHTARI,
+            JSON.stringify(projeKaydi)
         );
 
-        if (jsonDosyalari.length === 0) {
+        localStorage.setItem(
+            BILGI_KAYIT_ANAHTARI,
+            JSON.stringify(veri.tanitimBilgileri)
+        );
+
+        // Uçuş alanlarını, tanıtım modalını ve harita yazılarını doldur.
+        ucusAyarlariniYukle();
+
+        if (hataliYolYazilari.length) {
+            console.warn('Geçersiz yol yazısı kayıtları atlandı:', hataliYolYazilari);
             bildirimGoster(
-                'GitHub klasöründe JSON dosyası bulunamadı.',
-                'olumsuz'
+                `Import tamamlandı. ${gecerliYolYazilari.length} yol yazısı aktarıldı, ${hataliYolYazilari.length} hatalı kayıt atlandı.`,
+                'uyari'
             );
-            return;
+        } else {
+            bildirimGoster(`Uçuş, tanıtım ve ${gecerliYolYazilari.length} yol yazısı içe aktarıldı.`, 'olumlu');
         }
 
-        // Modal arka planı.
-        secimModal = document.createElement('div');
-
-        secimModal.style.cssText = `
-            position: fixed;
-            inset: 0;
-            z-index: 99999;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 18px;
-            box-sizing: border-box;
-            background: rgba(10, 18, 32, 0.72);
-            backdrop-filter: blur(6px);
-            -webkit-backdrop-filter: blur(6px);
-        `;
-
-        // Modal kutusu.
-        const kutu = document.createElement('div');
-
-        
-		kutu.style.cssText = `
-		    width: 100%;
-		    max-width: 400px;
-		    padding: 0;
-		    box-sizing: border-box;
-		    background: #ffffff;
-		    color: #1e293b;
-		    border: 1px solid #e2e8f0;
-		    border-radius: 10px;
-		    box-shadow: 0 18px 50px rgba(0,0,0,0.25);
-		    font-family: Arial, sans-serif;
-		    overflow: hidden;
-		    animation: ucusModalAc 0.2s ease-out;
-		`;
-
-
-        // Animasyon.
-	      if (!document.getElementById('ucus-import-modal-css')) {
-	    const stil = document.createElement('style');
-	    stil.id = 'ucus-import-modal-css';
-	
-	    stil.textContent = `
-	        @keyframes ucusModalAc {
-	            from {
-	                opacity: 0;
-	                transform: translateY(12px) scale(0.98);
-	            }
-	            to {
-	                opacity: 1;
-	                transform: translateY(0) scale(1);
-	            }
-	        }
-	
-	        /* Açılır liste: modern görünüm */
-	        #ucus-import-modal-select,
-	        #ucus-import-modal-select::picker(select) {
-	            appearance: base-select;
-	        }
-			#ucus-import-modal-select {
-			    width: 100% !important;
-			}		
-			#ucus-import-modal-select::picker-icon {
-			    margin-left: auto;
-			    margin-right: 0;
-			}
-	
-	        #ucus-import-modal-select {
-	            border-radius: 10px !important;
-	            background: linear-gradient(135deg, #ffffff, #f1f5f9) !important;
-	            color: #1e293b !important;
-	            cursor: pointer;
-	            transition: border-color 0.2s, box-shadow 0.2s;
-	        }
-	
-	        #ucus-import-modal-select:hover {
-	            border-color: #0891b2 !important;
-	        }
-	
-	        #ucus-import-modal-select:focus {
-	            outline: 3px solid rgba(8, 145, 178, 0.18);
-	            border-color: #0891b2 !important;
-	        }
-	
-	        #ucus-import-modal-select::picker-icon {
-	            color: #0891b2;
-	            transition: rotate 0.2s;
-	        }
-	
-	        #ucus-import-modal-select:open::picker-icon {
-	            rotate: 180deg;
-	        }
-	
-	        #ucus-import-modal-select::picker(select) {
-	            margin-top: 6px;
-	            padding: 5px;
-	            border: 1px solid #dbeafe;
-	            border-radius: 12px;
-	            background: #ffffff;
-	            box-shadow: 0 14px 35px #0f172a24;
-	            color: #1e293b;
-	            font-family: 'Inter', sans-serif;
-	            font-size: 13px;
-	        }
-	
-	        #ucus-import-modal-select option {
-	            padding: 11px 12px;
-	            margin: 2px 0;
-	            border: 0;
-	            border-radius: 7px;
-	        }
-	
-	        #ucus-import-modal-select option:checked {
-	            background: #cffafe;
-	            color: #155e75;
-	            font-weight: 600;
-	        }
-	
-	        #ucus-import-tamam:active,
-	        #ucus-import-iptal:active {
-	            transform: scale(0.98);
-	        }
-	
-	        @media (max-width: 480px) {
-	            #ucus-import-modal-kutu {
-	                width: calc(100vw - 32px) !important;
-	                max-width: 400px !important;
-	                min-width: 0 !important;
-	                padding: 0 !important;
-	                box-sizing: border-box !important;
-	                border-radius: 10px !important;
-	                background: #ffffff !important;
-	                border: 1px solid #e2e8f0 !important;
-	                box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25) !important;
-	                overflow: hidden !important;
-	            }
-	
-	            #ucus-import-modal-kutu h3 {
-	                margin: 0 !important;
-	                padding: 12px 42px 12px 14px !important;
-	                box-sizing: border-box !important;
-	                background: #0f172a !important;
-	                color: #ffffff !important;
-	                font-family: 'Inter', sans-serif !important;
-	                font-size: 14px !important;
-	                line-height: 1.4 !important;
-	                font-weight: 600 !important;
-	            }
-	
-	            #ucus-import-modal-kutu p {
-	                margin: 0 !important;
-	                padding: 12px 14px 8px !important;
-	                box-sizing: border-box !important;
-	                color: #64748b !important;
-	                font-family: 'Inter', sans-serif !important;
-	                font-size: 12px !important;
-	                line-height: 1.5 !important;
-	            }
-	
-	            #ucus-import-modal-kutu select {
-	                display: block !important;
-	                width: calc(100% - 28px) !important;
-	                min-width: 0 !important;
-	                min-height: 40px !important;
-	                margin: 0 14px 12px !important;
-	                padding: 8px !important;
-	                box-sizing: border-box !important;
-	                border: 1px solid #cbd5e1 !important;
-	                border-radius: 10px !important;
-	                background: linear-gradient(135deg, #ffffff, #f1f5f9) !important;
-	                color: #1e293b !important;
-	                font-family: 'Inter', sans-serif !important;
-	                font-size: 12px !important;
-	            }
-	
-	            #ucus-import-modal-butonlar {
-	                display: flex !important;
-	                flex-direction: row !important;
-	                justify-content: flex-end !important;
-	                align-items: center !important;
-	                gap: 8px !important;
-	                width: 100% !important;
-	                margin: 0 !important;
-	                padding: 10px 14px !important;
-	                box-sizing: border-box !important;
-	                border-top: 1px solid #e2e8f0 !important;
-	            }
-	
-	            #ucus-import-iptal,
-	            #ucus-import-tamam {
-	                display: block !important;
-	                flex: 1 1 0 !important;
-	                width: 0 !important;
-	                min-width: 0 !important;
-	                max-width: 100% !important;
-	                min-height: 36px !important;
-	                margin: 0 !important;
-	                padding: 8px 4px !important;
-	                box-sizing: border-box !important;
-	                border: 0 !important;
-	                border-radius: 5px !important;
-	                font-family: 'Inter', sans-serif !important;
-	                font-size: 12px !important;
-	                font-weight: 600 !important;
-	                line-height: 1.2 !important;
-	                white-space: nowrap !important;
-	                box-shadow: none !important;
-	            }
-	
-	            #ucus-import-iptal {
-	                background: #e2e8f0 !important;
-	                color: #334155 !important;
-	            }
-	
-	            #ucus-import-tamam {
-	                background: #0891b2 !important;
-	                color: #ffffff !important;
-	            }
-	        }
-	    `;
-	
-	    document.head.appendChild(stil);
-	}
-
-        kutu.id = 'ucus-import-modal-kutu';
-
-        // Üst simge.
-        const simge = document.createElement('div');
-
-        simge.textContent = '✈';
-        simge.style.cssText = `
-		    display: flex;
-		    align-items: center;
-		    justify-content: center;
-		    width: 36px;
-		    height: 36px;
-		    margin-bottom: 6px;
-		    border-radius: 8px;
-		    background: #eaf2ff;
-		    color: #2563eb;
-		    font-size: 19px;
-		`;
-
-        // Başlık.
-        const baslik = document.createElement('h3');
-
-        baslik.textContent = 'Uçuş Dosyası Yükle';
-
-		const kapatBtn = document.createElement('button');
-			kapatBtn.textContent = '×';
-			kapatBtn.type = 'button';
-			kapatBtn.title = 'Kapat';
-			kapatBtn.style.cssText = `
-			    position: absolute;
-			    top: 10px;
-			    right: 12px;
-			    width: 28px;
-			    height: 28px;
-			    padding: 0;
-			    border: 0;
-			    border-radius: 5px;
-			    background: transparent;
-			    color: #64748b;
-			    font-size: 24px;
-			    line-height: 1;
-			    cursor: pointer;
-			`;
-			
-			kapatBtn.addEventListener('click', () => secimModal.remove());
-        
-		baslik.style.cssText = `
-		    margin: 0;
-		    padding: 15px 16px;
-		    background: #666666;
-		    color: #ffffff;
-		    font-size: 15px;
-		    line-height: 1.4;
-		    font-weight: 600;
-		`;
-
-
-        // Açıklama.
-        const aciklama = document.createElement('p');
-
-        aciklama.textContent =
-            'GitHub arşivindeki uçuş dosyalarından birini seçin.';
-
-        
-		aciklama.style.cssText = `
-		    margin: 0;
-		    padding: 16px 16px 10px;
-		    font-size: 13px;
-		    line-height: 1.5;
-		    color: #64748b;
-		`;
-
-
-        // Dosya seçim listesi.
-        const liste = document.createElement('select');
-
-        liste.id = 'ucus-import-modal-select';
-
-        
-		liste.style.cssText = `
-		    display: block;
-		    width: calc(100% - 32px);
-		    min-height: 46px;
-		    padding: 10px;
-		    margin: 0 16px 16px;
-		    box-sizing: border-box;
-		    border: 1px solid #cbd5e1;
-		    border-radius: 6px;
-		    background: #ffffff;
-		    color: #1e293b;
-		    font-size: 12px;
-		    font-family: 'Inter', sans-serif;
-		    cursor: pointer;
-		`;
-
-
-        // İlk seçenek: kullanıcı dosyayı kendisi seçsin.
-        const varsayilanSecenek = document.createElement('option');
-
-        varsayilanSecenek.value = '';
-        varsayilanSecenek.textContent = 'Dosya adı seçin';
-        varsayilanSecenek.disabled = true;
-        varsayilanSecenek.selected = true;
-
-        liste.appendChild(varsayilanSecenek);
-
-        // GitHub dosyalarını listeye ekle.
-        jsonDosyalari
-            .sort((a, b) => a.name.localeCompare(b.name, 'tr'))
-            .forEach(dosya => {
-                const secenek = document.createElement('option');
-
-                secenek.value = dosya.download_url;
-                secenek.textContent = dosya.name;
-
-                liste.appendChild(secenek);
-            });
-
-		const dosyaSayisi = document.createElement('p');
-
-		dosyaSayisi.textContent = jsonDosyalari.length + ' dosya bulundu.';
-		dosyaSayisi.style.cssText = `
-		    margin: -12px 16px 6px;
-		    font-family: 'Inter', sans-serif;
-		    font-size: 11px;
-		    color: #64748b;
-		`;
-		
-		liste.insertAdjacentElement('afterend', dosyaSayisi);
-
-        // Buton alanı.
-        const butonlar = document.createElement('div');
-
-        butonlar.id = 'ucus-import-modal-butonlar';
-
-        butonlar.style.cssText = `
-            display: flex;
-            gap: 12px;
-            width: 100%;
-        `;
-
-        // İptal butonu.
-        const iptalBtn = document.createElement('button');
-
-        iptalBtn.id = 'ucus-import-iptal';
-        iptalBtn.type = 'button';
-        iptalBtn.textContent = 'Vazgeç';
-
-        
-		iptalBtn.style.cssText = `
-		    flex: 1;
-		    min-width: 0;
-		    min-height: 42px;
-		    padding: 10px 14px;
-		    border: 0;
-		    border-radius: 5px;
-		    background: #e2e8f0;
-		    color: #334155;
-		    font-size: 12px;
-		    font-weight: 600;
-		    cursor: pointer;
-		    transition: transform 0.15s, background 0.15s;
-		`;
-
-
-        // Tamam butonu.
-        const ekleBtn = document.createElement('button');
-
-        ekleBtn.id = 'ucus-import-tamam';
-        ekleBtn.type = 'button';
-        ekleBtn.textContent = 'Tamam';
-
-        
-		ekleBtn.style.cssText = `
-		    flex: 1.3;
-		    min-width: 0;
-		    min-height: 42px;
-		    padding: 10px 14px;
-		    border: 0;
-		    border-radius: 5px;
-		    background: #0891b2;
-		    color: #ffffff;
-		    font-size: 12px;
-		    font-weight: 600;
-		    cursor: pointer;
-		    box-shadow: none;
-		    transition: transform 0.15s, background 0.15s;
-		`;
-
-
-        // Pencereyi kapat.
-        const modalKapat = () => {
-            if (secimModal && secimModal.isConnected) {
-                secimModal.remove();
-            }
-        };
-
-        iptalBtn.onclick = modalKapat;
-
-        // Dış alana tıklanınca kapat.
-        secimModal.addEventListener('click', function (e) {
-            if (e.target === secimModal) {
-                modalKapat();
-            }
-        });
-
-        // ESC tuşuyla kapat.
-        const escDinleyici = function (e) {
-            if (e.key === 'Escape' && secimModal?.isConnected) {
-                modalKapat();
-            }
-        };
-
-        document.addEventListener('keydown', escDinleyici);
-
-        // Modal kaldırıldığında ESC dinleyicisini temizle.
-        const modalIzleyici = new MutationObserver(() => {
-            if (!secimModal.isConnected) {
-                document.removeEventListener('keydown', escDinleyici);
-                modalIzleyici.disconnect();
-            }
-        });
-
-        modalIzleyici.observe(document.body, {
-            childList: true
-        });
-
-        // Pencere içeriğini oluştur.
-        butonlar.append(iptalBtn, ekleBtn);
-
-		kutu.style.position = 'relative';
-		kutu.append(simge, baslik, aciklama, liste, dosyaSayisi, butonlar, kapatBtn);
-		
-        secimModal.appendChild(kutu);
-        document.body.appendChild(secimModal);
-
-        // Tamam: seçilen JSON dosyasını yükle.
-        ekleBtn.onclick = async () => {
-            if (!liste.value) {
-                bildirimGoster(
-                    'Lütfen önce bir dosya adı seçin.',
-                    'olumsuz'
-                );
-                liste.focus();
-                return;
-            }
-
-            ekleBtn.disabled = true;
-            iptalBtn.disabled = true;
-            liste.disabled = true;
-
-            ekleBtn.textContent = 'Yükleniyor...';
-            ekleBtn.style.opacity = '0.7';
-            ekleBtn.style.cursor = 'wait';
-
-            try {
-                // Seçilen JSON dosyasını GitHub'dan oku.
-                const dosyaCevap = await fetch(liste.value);
-
-                if (!dosyaCevap.ok) {
-                    throw new Error('GitHub JSON dosyası okunamadı.');
-                }
-
-                const veri = await dosyaCevap.json();
-
-                // Mevcut JSON doğrulaması.
-                if (
-                    veri.format !== 'ennetmax-ucus-projesi' ||
-                    veri.version !== 1 ||
-                    !veri.ucusAyarlari ||
-                    !Array.isArray(veri.ucusAyarlari.duraklar) ||
-                    !Array.isArray(veri.tanitimBilgileri)
-                ) {
-                    throw new Error('JSON dosya biçimi geçersiz.');
-                }
-
-                const ayarlar = veri.ucusAyarlari;
-
-                for (const alan of [
-                    'baslangicZoom',
-                    'ucusZoom',
-                    'kameraAcisi',
-                    'kameraYonu'
-                ]) {
-                    if (!Number.isFinite(Number(ayarlar[alan]))) {
-                        throw new Error('Kamera ayarı geçersiz: ' + alan);
-                    }
-                }
-
-                for (const durak of ayarlar.duraklar) {
-                    if (
-                        !durak ||
-                        typeof durak.ad !== 'string' ||
-                        typeof durak.koordinat !== 'string'
-                    ) {
-                        throw new Error('Durak bilgisi geçersiz.');
-                    }
-
-                    const koordinat = durak.koordinat.split(',').map(Number);
-
-                    if (
-                        koordinat.length !== 2 ||
-                        !koordinat.every(Number.isFinite) ||
-                        koordinat[0] < -180 ||
-                        koordinat[0] > 180 ||
-                        koordinat[1] < -90 ||
-                        koordinat[1] > 90
-                    ) {
-                        throw new Error(
-                            'Geçersiz koordinat: ' + durak.koordinat
-                        );
-                    }
-                }
-
-                for (const bilgi of veri.tanitimBilgileri) {
-                    if (
-                        !bilgi ||
-                        typeof bilgi.text !== 'string' ||
-                        typeof bilgi.color !== 'string' ||
-                        !Number.isFinite(Number(bilgi.size)) ||
-                        !Number.isFinite(Number(bilgi.weight)) ||
-                        typeof bilgi.isBadge !== 'boolean'
-                    ) {
-                        throw new Error('Tanıtım bilgisi geçersiz.');
-                    }
-                }
-
-                // Mevcut kayıt anahtarlarına kaydet.
-                localStorage.setItem(
-                    UCUS_AYAR_KAYIT_ANAHTARI,
-                    JSON.stringify(ayarlar)
-                );
-
-                localStorage.setItem(
-                    BILGI_KAYIT_ANAHTARI,
-                    JSON.stringify(veri.tanitimBilgileri)
-                );
-
-                // Mevcut yükleme fonksiyonları.
-				ucusAyarlariniYukle();
-				
-				// Yol yazılarını ayrıca yükle.
-				const yolKayitlari = Array.isArray(ayarlar.yolYazilari)
-				    ? ayarlar.yolYazilari
-				    : [];
-				
-				localStorage.setItem(
-				    'ennetmax_yol_yazilari_v1',
-				    JSON.stringify(yolKayitlari)
-				);
-				
-				// Mevcut toplu yol yazısı sistemini kullan.
-				yolYazilariniYukle(yolKayitlari, {
-				    temizle: true
-				});
-				
-				// Tanıtım bilgilerini yükle.
-				tanitimBilgileri = veri.tanitimBilgileri;
-
-                const bilgiModal = document.getElementById('bilgiler-modal');
-
-                if (bilgiModal && bilgiModal.style.display !== 'none') {
-                    bilgiSatirlariniGoster();
-                }
-
-                modalKapat();
-
-                bildirimGoster(
-                    'GitHub uçuş ve tanıtım bilgileri içe aktarıldı.',
-                    'olumlu'
-                );
-
-            } catch (hata) {
-                console.error('Import hatası:', hata);
-
-                bildirimGoster(
-                    hata.message || 'Dosya yüklenemedi.',
-                    'olumsuz'
-                );
-
-                // Hata durumunda yeniden seçim yapılabilsin.
-                ekleBtn.disabled = false;
-                iptalBtn.disabled = false;
-                liste.disabled = false;
-
-                ekleBtn.textContent = 'Tekrar Dene';
-                ekleBtn.style.opacity = '1';
-                ekleBtn.style.cursor = 'pointer';
-            }
-        };
     } catch (hata) {
-        console.error('GitHub import hatası:', hata);
-
+        console.error('Import hatası:', hata);
         bildirimGoster(
-            'GitHub klasörü okunamadı. Depo herkese açık mı kontrol et.',
+            'Import başarısız: ' + (hata.message || 'Bilinmeyen hata.'),
             'olumsuz'
         );
+    } finally {
+        event.target.value = '';
     }
 });
 
