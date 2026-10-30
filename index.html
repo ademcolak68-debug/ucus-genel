@@ -2132,6 +2132,15 @@ function yolYazilariniYukle(kayitlar, { temizle = false } = {}) {
         try {
             if (!yolYazisiHaritaVerisiniGuncelle()) {
                 throw new Error('Toplu yol yazısı katmanı oluşturulamadı.');
+
+console.log('GITHUB YOL YAZISI ÇİZİM KONTROLÜ', {
+    kayitSayisi: window.yolYazilari.length,
+    stilHazir: map.isStyleLoaded(),
+    kaynak: !!map.getSource(YOL_YAZISI_TOPLU_KAYNAK_ID),
+    katman: !!map.getLayer(YOL_YAZISI_TOPLU_KATMAN_ID),
+    geojson: yolYazisiGeoJSONHazirla(window.yolYazilari)
+});
+				
             }
         } catch (hata) {
             console.error('Toplu yol yazısı çizim hatası:', hata);
