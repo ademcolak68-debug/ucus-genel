@@ -3209,6 +3209,31 @@ geojsonEkleBtn.addEventListener('click', async function () {
 });
 
 
+const yolYazilariAcBtn = document.getElementById('yol-yazilari-ac-btn');
+const yolYazisiModal = document.getElementById('yol-yazisi-modal');
+const yolYazisiKapatBtn = document.getElementById('yol-yazisi-kapat-btn');
+const yolYazisiIptalBtn = document.getElementById('yol-yazisi-iptal-btn');
+
+// Modalı aç
+yolYazilariAcBtn.addEventListener('click', function () {
+    yolYazisiModal.style.display = 'flex';
+});
+
+// Modalı kapat
+function yolYazisiModalKapat() {
+    yolYazisiModal.style.display = 'none';
+
+    if (yolYazisiSecimAktif) map.getCanvas().style.cursor = '';
+    yolYazisiSecimAktif = false;
+    yolYazisiIlkNokta = null;
+
+    document.getElementById('yol-yazisi-ekle-onay-btn')
+        .textContent = 'Ekle';
+}
+
+yolYazisiKapatBtn.addEventListener('click', yolYazisiModalKapat);
+yolYazisiIptalBtn.addEventListener('click', yolYazisiModalKapat);
+
 
 
 (function () {
