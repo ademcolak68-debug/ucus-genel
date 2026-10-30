@@ -2131,17 +2131,15 @@ function yolYazilariniYukle(kayitlar, { temizle = false } = {}) {
         window.yolYazilari = kabulEdilenler;
         try {
             if (!yolYazisiHaritaVerisiniGuncelle()) {
-                throw new Error('Toplu yol yazısı katmanı oluşturulamadı.');
-
-console.log('GITHUB YOL YAZISI ÇİZİM KONTROLÜ', {
-    kayitSayisi: window.yolYazilari.length,
-    stilHazir: map.isStyleLoaded(),
-    kaynak: !!map.getSource(YOL_YAZISI_TOPLU_KAYNAK_ID),
-    katman: !!map.getLayer(YOL_YAZISI_TOPLU_KATMAN_ID),
-    geojson: yolYazisiGeoJSONHazirla(window.yolYazilari)
-});
-				
+                throw new Error('Toplu yol yazısı katmanı oluşturulamadı.')			
             }
+			console.log('GITHUB YOL YAZISI ÇİZİM KONTROLÜ', {
+			    kayitSayisi: window.yolYazilari.length,
+			    stilHazir: map.isStyleLoaded(),
+			    kaynak: !!map.getSource(YOL_YAZISI_TOPLU_KAYNAK_ID),
+			    katman: !!map.getLayer(YOL_YAZISI_TOPLU_KATMAN_ID),
+			    geojson: yolYazisiGeoJSONHazirla(window.yolYazilari)
+			});
         } catch (hata) {
             console.error('Toplu yol yazısı çizim hatası:', hata);
             // Katman oluşturma hatasında veriler bellekte korunur; çizim hatası gizlenmez.
