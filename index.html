@@ -2163,57 +2163,6 @@ function yolYazilariniYukle(kayitlar, { temizle = false } = {}) {
 }
 
 
-// Ekle: her işlem iki yeni harita noktası seçerek ayrı bir yazı oluşturur.
-document.getElementById('yol-yazisi-ekle-onay-btn').addEventListener('click', function () {
-    const yolAdi = document.getElementById('yol-yazisi-metni').value.trim();
-    const boyut = Number(document.getElementById('yol-yazisi-size').value);
-    if (!yolAdi) { bildirimGoster('Lütfen yol adını girin.', 'uyari'); return; }
-    if (!Number.isFinite(boyut) || boyut < 6 || boyut > 50) {
-        bildirimGoster('Yazı boyutu 6 ile 50 arasında olmalıdır.', 'uyari'); return;
-    }
-    if (koordinatSecilecekInput) {
-        bildirimGoster('Önce devam eden rota koordinat seçimini tamamlayın.', 'uyari'); return;
-    }
-    secilenYolAdi = yolAdi;
-    secilenYolBoyutu = boyut;
-    yolYazisiIlkNokta = null;
-    yolYazisiSecimAktif = true;
-    map.getCanvas().style.cursor = 'crosshair';
-    this.textContent = '1. Noktayı Seç';
-    bildirimGoster('Haritadan yolun başlangıç noktasını seçin.', 'bilgi');
-});
-
-// Yeni yazı düğmesi
-document.getElementById('yol-yazisi-yeni-btn')
-    .addEventListener('click', function () {
-
-        yolYazisiSecimAktif = false;
-        yolYazisiIlkNokta = null;
-        map.getCanvas().style.cursor = '';
-
-        document.getElementById('yol-yazisi-metni').value = '';
-        document.getElementById('yol-yazisi-size').value = 13;
-
-        document.getElementById('yol-yazisi-ekle-onay-btn')
-            .textContent = 'Ekle';
-
-        document.getElementById('yol-yazisi-metni').focus();
-
-    });
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 let koordinatSecilecekInput = null;
 
 document.addEventListener('click', function (e) {
