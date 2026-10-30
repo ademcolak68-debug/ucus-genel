@@ -1802,7 +1802,9 @@ function ucusAyarlariniKaydet() {
             koordinat: kart.querySelector('.durak-koordinat').value,
             sure: kart.querySelector('.durak-suresi').value,
             etiket: kart.querySelector('.durak-etiket').value
-        }))
+        })),
+
+		yolYazilari: yolYazisiKayitlariniHazirla()
     };
 
     try {
@@ -1860,6 +1862,11 @@ function ucusAyarlariniYukle() {
         } else {
             durakEkle();
         }
+
+		yolYazilariniYukle(
+		    Array.isArray(ayarlar.yolYazilari) ? ayarlar.yolYazilari : [],
+		    { temizle: true }
+		);
 
         rotaBasliklariniGuncelle();
         bildirimGoster('Kayıtlı uçuş ayarları yüklendi.', 'olumlu');
