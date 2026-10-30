@@ -3656,9 +3656,25 @@ document.getElementById('ucus-import-btn').addEventListener('click', async funct
                 );
 
                 // Mevcut yükleme fonksiyonları.
-                ucusAyarlariniYukle();
-
-                tanitimBilgileri = veri.tanitimBilgileri;
+				ucusAyarlariniYukle();
+				
+				// Yol yazılarını ayrıca yükle.
+				const yolKayitlari = Array.isArray(ayarlar.yolYazilari)
+				    ? ayarlar.yolYazilari
+				    : [];
+				
+				localStorage.setItem(
+				    'ennetmax_yol_yazilari_v1',
+				    JSON.stringify(yolKayitlari)
+				);
+				
+				// Mevcut toplu yol yazısı sistemini kullan.
+				yolYazilariniYukle(yolKayitlari, {
+				    temizle: true
+				});
+				
+				// Tanıtım bilgilerini yükle.
+				tanitimBilgileri = veri.tanitimBilgileri;
 
                 const bilgiModal = document.getElementById('bilgiler-modal');
 
