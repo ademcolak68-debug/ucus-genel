@@ -3666,21 +3666,22 @@ document.getElementById('ucus-export-btn').addEventListener('click', function ()
 
         // Ekrandaki güncel uçuş ayarlarını al.
         const ucusAyarlari = {
-            baslangicZoom: document.getElementById('baslangic-zoom').value,
-            ucusZoom: document.getElementById('ucus-zoom').value,
-            kameraAcisi: document.getElementById('kamera-acisi').value,
-            kameraYonu: document.getElementById('kamera-yonu').value,
-            duraklar: Array.from(
-                document.querySelectorAll('#rota-listesi .rota-kart')
-            ).map(function (kart) {
-                return {
-                    ad: kart.querySelector('.durak-adi')?.value || '',
-                    koordinat: kart.querySelector('.durak-koordinat')?.value || '',
-                    sure: kart.querySelector('.durak-suresi')?.value || '',
-                    etiket: kart.querySelector('.durak-etiket')?.value || ''
-                };
-            })
-        };
+		    baslangicZoom: document.getElementById('baslangic-zoom').value,
+		    ucusZoom: document.getElementById('ucus-zoom').value,
+		    kameraAcisi: document.getElementById('kamera-acisi').value,
+		    kameraYonu: document.getElementById('kamera-yonu').value,
+		    duraklar: Array.from(
+		        document.querySelectorAll('#rota-listesi .rota-kart')
+		    ).map(function (kart) {
+		        return {
+		            ad: kart.querySelector('.durak-adi')?.value || '',
+		            koordinat: kart.querySelector('.durak-koordinat')?.value || '',
+		            sure: kart.querySelector('.durak-suresi')?.value || '',
+		            etiket: kart.querySelector('.durak-etiket')?.value || ''
+		        };
+		    }),
+		    yolYazilari: yolYazisiKayitlariniHazirla()
+		};
 
         const proje = {
             format: 'ennetmax-ucus-projesi',
